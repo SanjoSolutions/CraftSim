@@ -20,8 +20,8 @@ function CraftSim.AVERAGEPROFIT.FRAMES:Init()
         "BOTTOMRIGHT", 
         0, 
         0, 
-        320,
-        120,
+        400,
+        140,
         CraftSim.CONST.FRAMES.STAT_WEIGHTS, false, true, nil, "modulesStatWeights")
 
     local frameWorkOrder = CraftSim.FRAME:CreateCraftSimFrame(
@@ -103,9 +103,13 @@ function CraftSim.AVERAGEPROFIT.FRAMES:UpdateAverageProfitDisplay(priceData, sta
             valueText = valueText .. CraftSim.UTIL:FormatMoney(statWeights.multicraft) .. "\n"
         end
         if statWeights.resourcefulness then
-            statText = statText .. "Resourcefulness:"
-            valueText = valueText .. CraftSim.UTIL:FormatMoney(statWeights.resourcefulness)
+            statText = statText .. "Resourcefulness:" .. "\n"
+            valueText = valueText .. CraftSim.UTIL:FormatMoney(statWeights.resourcefulness) .. "\n"
         end
+        statText = statText .. "\nAverage crafting cost per crafted item:"
+        local averageAmountProducedPerCraft = statWeights.craftedItems.baseQuality + statWeights.craftedItems.nextQuality
+        local averageCraftingCostPerCraftedItem = priceData.craftingCostPerCraft / averageAmountProducedPerCraft
+        valueText = valueText .. "\n" .. CraftSim.UTIL:FormatMoney(averageCraftingCostPerCraftedItem, false)
         statweightFrame.content.statText:SetText(statText)
         statweightFrame.content.valueText:SetText(valueText)
     end

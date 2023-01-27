@@ -254,7 +254,7 @@ function CraftSim.CALC:getMeanProfitOLD(recipeData, priceData)
 
     calculationData.craftingCostPerCraft = totalCraftingCosts
 
-    return meanProfit, calculationData
+    return meanProfit, calculationData, craftedItems
 end
 
 function CraftSim.CALC:getMeanProfit(recipeData, priceData)

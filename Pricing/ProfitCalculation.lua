@@ -254,7 +254,18 @@ function CraftSim.CALC:getMeanProfitOLD(recipeData, priceData)
 
     calculationData.craftingCostPerCraft = totalCraftingCosts
 
-    return meanProfit, calculationData, craftedItems
+    local sellPricePerItem = 0
+    local amount = craftedItems.baseQuality + craftedItems.nextQuality
+    if recipeData.expectedQuality == recipeData.maxQuality or recipeData.result.isNoQuality then
+        sellPricePerItem = craftedItems.baseQuality / amount * (priceData.minBuyoutPerQuality[recipeData.expectedQuality] or 0)
+    else
+        sellPricePerItem = craftedItems.baseQuality / amount * (priceData.minBuyoutPerQuality[recipeData.expectedQuality] or 0) +
+            craftedItems.nextQuality / amount * (priceData.minBuyoutPerQuality[inspirationQuality] or 0)
+    end
+    local craftingCostPerItem = totalCraftingCosts / amount
+    local profitPerItem = sellPricePerItem * CraftSim.CONST.AUCTION_HOUSE_CUT - craftingCostPerItem
+
+    return meanProfit, calculationData, craftedItems, profitPerItem
 end
 
 function CraftSim.CALC:getMeanProfit(recipeData, priceData)
@@ -319,45 +330,63 @@ function CraftSim.CALC:getMeanProfit(recipeData, priceData)
 
             local craftingCosts = priceData.craftingCostPerCraft - ((procs[3] and savedCostsByRes) or 0)
 
-            local combinationProfit = 0
-            local resultValue = 0
+            local amount
+            local quality
 
             -- if insp but not mc
             if procs[1] and not procs[2] then
-                resultValue = (priceData.minBuyoutPerQuality[qualityWithInspiration] or 0) * recipeData.baseItemAmount * CraftSim.CONST.AUCTION_HOUSE_CUT
+                amount = recipeData.baseItemAmount
+                quality = qualityWithInspiration
             -- if mc but not insp
             elseif not procs[1] and procs[2] then
-                resultValue = (priceData.minBuyoutPerQuality[recipeData.expectedQuality] or 0) * expectedItems * CraftSim.CONST.AUCTION_HOUSE_CUT
+                amount = expectedItems
+                quality = recipeData.expectedQuality
             -- both procs
             elseif procs[1] and procs[2] then
-                resultValue = (priceData.minBuyoutPerQuality[qualityWithInspiration] or 0) * expectedItems * CraftSim.CONST.AUCTION_HOUSE_CUT
+                amount = expectedItems
+                quality = qualityWithInspiration
             -- no mc and no insp
             elseif not procs[1] and not procs[2] then
-                resultValue = (priceData.minBuyoutPerQuality[recipeData.expectedQuality] or 0) * recipeData.baseItemAmount * CraftSim.CONST.AUCTION_HOUSE_CUT
+                amount = recipeData.baseItemAmount
+                quality = recipeData.expectedQuality
             end
-            
-            combinationProfit = resultValue - craftingCosts
+
+            local moneyReceivedPerItem = (priceData.minBuyoutPerQuality[quality] or 0) * CraftSim.CONST.AUCTION_HOUSE_CUT
+            local profitPerItem = moneyReceivedPerItem - craftingCosts / amount
+            local combinationProfit = amount * moneyReceivedPerItem - craftingCosts
+
             print(table.concat(combination, "") .. ":" .. CraftSim.UTIL:round(combinationChance*100, 2) .. "% -> " .. CraftSim.UTIL:FormatMoney(combinationProfit, true))
             table.insert(probabilityTable, {
                 inspiration = procs[1],
                 multicraft = procs[2],
                 resourcefulness = procs[3],
                 chance = combinationChance,
-                profit = combinationProfit
+                profit = combinationProfit,
+                profitPerItem = profitPerItem,
+                amount = amount
             })
         end
 
         local probabilitySum = 0
         local expectedProfit = 0
+        local totalProfit = 0
+        local totalAmount = 0
         for _, entry in pairs(probabilityTable) do
             probabilitySum = probabilitySum + entry.chance
-            expectedProfit = expectedProfit + (entry.profit*entry.chance)
+            expectedProfit = expectedProfit + (entry.chance * entry.profit)
+            totalProfit = totalProfit + entry.chance * entry.amount * entry.profitPerItem
+            totalAmount = totalAmount + entry.chance * entry.amount
         end
+
+        -- average profit per item = sum(chance * profit per item)
+        -- average profit per craft = sum(chance * (amount * profit per item))
 
         print("Probability Sum: " .. tostring(probabilitySum))
         print("ExpectedProfit: " .. CraftSim.UTIL:FormatMoney(expectedProfit, true))
 
-        return expectedProfit, probabilityTable
+        local averageProfitPerItem = totalProfit / totalAmount
+
+        return expectedProfit, probabilityTable, averageProfitPerItem
     elseif not recipeData.stats.inspiration and recipeData.stats.multicraft and recipeData.stats.resourcefulness then
         local mcChance = recipeData.stats.multicraft.percent / 100
         local resChance = recipeData.stats.resourcefulness.percent / 100

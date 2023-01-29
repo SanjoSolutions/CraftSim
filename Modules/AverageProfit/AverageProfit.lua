@@ -64,15 +64,16 @@ function CraftSim.AVERAGEPROFIT:CalculateStatWeights(recipeData, priceData, expo
 
     local calculationResult = {} 
     local calculationData = {}
-    calculationResult.meanProfit, calculationData, calculationResult.craftedItems = CraftSim.CALC:getMeanProfitOLD(recipeData, priceData)
-    local meanProfitV2 = CraftSim.CALC:getMeanProfit(CraftSim.MAIN.currentRecipeData, priceData)
+    calculationResult.meanProfit, calculationData, calculationResult.craftedItems, calculationResult.profitPerItem = CraftSim.CALC:getMeanProfitOLD(recipeData, priceData)
+    local meanProfitV2, _, profitPerItem = CraftSim.CALC:getMeanProfit(CraftSim.MAIN.currentRecipeData, priceData)
    -- print("MeanProfitV1: " .. CraftSim.UTIL:FormatMoney(calculationResult.meanProfit, true))
     print("MeanProfitV2: " .. CraftSim.UTIL:FormatMoney(meanProfitV2, true))    
 
     calculationResult.meanProfit = meanProfitV2 or calculationResult.meanProfit
-
+    calculationResult.profitPerItem = profitPerItem or calculationResult.profitPerItem
 
     calculationData.meanProfit = calculationResult.meanProfit
+    calculationData.profitPerItem = calculationResult.profitPerItem
     CraftSim.AVERAGEPROFIT.FRAMES:UpdateExplanation(recipeData, calculationData, exportMode)
 
     local inspirationResults = CraftSim.AVERAGEPROFIT:getInspirationWeight(recipeData, priceData, calculationResult.meanProfit)

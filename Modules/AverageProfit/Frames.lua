@@ -12,38 +12,38 @@ end
 
 function CraftSim.AVERAGEPROFIT.FRAMES:Init()
     local frameNonWorkOrder = CraftSim.FRAME:CreateCraftSimFrame(
-        "CraftSimDetailsFrame", 
-        "CraftSim Average Profit", 
+        "CraftSimDetailsFrame",
+        "CraftSim Average Profit",
         ProfessionsFrame.CraftingPage.SchematicForm,
-        ProfessionsFrame.CraftingPage.SchematicForm, 
-        "BOTTOMRIGHT", 
-        "BOTTOMRIGHT", 
-        0, 
-        0, 
+        ProfessionsFrame.CraftingPage.SchematicForm,
+        "BOTTOMRIGHT",
+        "BOTTOMRIGHT",
+        0,
+        0,
         400,
-        140,
+        180,
         CraftSim.CONST.FRAMES.STAT_WEIGHTS, false, true, nil, "modulesStatWeights")
 
     local frameWorkOrder = CraftSim.FRAME:CreateCraftSimFrame(
-    "CraftSimDetailsWOFrame", 
-    "CraftSim Average Profit " .. CraftSim.UTIL:ColorizeText("WO", CraftSim.CONST.COLORS.GREY), 
+    "CraftSimDetailsWOFrame",
+    "CraftSim Average Profit " .. CraftSim.UTIL:ColorizeText("WO", CraftSim.CONST.COLORS.GREY),
     ProfessionsFrame.OrdersPage.OrderView.OrderDetails,
-    ProfessionsFrame.OrdersPage.OrderView.OrderDetails, 
-    "BOTTOMRIGHT", 
-    "BOTTOMRIGHT", 
-    0, 
-    0, 
-    320,
-    120,
+    ProfessionsFrame.OrdersPage.OrderView.OrderDetails,
+    "BOTTOMRIGHT",
+    "BOTTOMRIGHT",
+    0,
+    0,
+    400,
+    180,
     CraftSim.CONST.FRAMES.STAT_WEIGHTS_WORK_ORDER, false, true, nil, "modulesStatWeights")
 
     local function createContent(frame, profitDetailsFrameID, statisticsFrameID)
         frame.content.breakdownButton = CreateFrame("Button", nil, frame.content, "UIPanelButtonTemplate")
-        frame.content.breakdownButton:SetPoint("TOP", frame.title, "TOP", (statisticsFrameID and -60) or 0, -15)	
+        frame.content.breakdownButton:SetPoint("TOP", frame.title, "TOP", (statisticsFrameID and -60) or 0, -15)
         frame.content.breakdownButton:SetText("Show Explanation")
         frame.content.breakdownButton:SetSize(frame.content.breakdownButton:GetTextWidth() + 15, 20)
         frame.content.breakdownButton:SetScript("OnClick", function(self)
-            local profitDetailsFrame = CraftSim.FRAME:GetFrame(profitDetailsFrameID) 
+            local profitDetailsFrame = CraftSim.FRAME:GetFrame(profitDetailsFrameID)
             local isVisible = profitDetailsFrame:IsVisible()
             CraftSim.FRAME:ToggleFrame(profitDetailsFrame, not isVisible)
             frame.content.breakdownButton:SetText(isVisible and "Show Explanation" or not isVisible and "Hide Explanation")
@@ -53,13 +53,13 @@ function CraftSim.AVERAGEPROFIT.FRAMES:Init()
         frame.content.breakdownButton.tooltip = "Test"
 
         if statisticsFrameID then
-            frame.content.statisticsButton = CraftSim.FRAME:CreateButton("Show Statistics", frame.content, frame.content.breakdownButton, "LEFT", "RIGHT", 1, 0, 15, 20, true, 
-            function() 
+            frame.content.statisticsButton = CraftSim.FRAME:CreateButton("Show Statistics", frame.content, frame.content.breakdownButton, "LEFT", "RIGHT", 1, 0, 15, 20, true,
+            function()
                 local statisticsFrame = CraftSim.FRAME:GetFrame(statisticsFrameID)
                 CraftSim.FRAME:ToggleFrame(statisticsFrame, not statisticsFrame:IsVisible())
             end)
         end
-        
+
 
         frame.content.statText = frame.content:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         frame.content.statText:SetPoint("LEFT", frame.content, "LEFT", 15, -20)
@@ -72,7 +72,7 @@ function CraftSim.AVERAGEPROFIT.FRAMES:Init()
     createContent(frameNonWorkOrder, CraftSim.CONST.FRAMES.PROFIT_DETAILS, CraftSim.CONST.FRAMES.STATISTICS)
     createContent(frameWorkOrder, CraftSim.CONST.FRAMES.PROFIT_DETAILS_WORK_ORDER)
 
-    
+
 end
 
 function CraftSim.AVERAGEPROFIT.FRAMES:UpdateAverageProfitDisplay(priceData, statWeights, exportMode)
@@ -106,10 +106,14 @@ function CraftSim.AVERAGEPROFIT.FRAMES:UpdateAverageProfitDisplay(priceData, sta
             statText = statText .. "Resourcefulness:" .. "\n"
             valueText = valueText .. CraftSim.UTIL:FormatMoney(statWeights.resourcefulness) .. "\n"
         end
-        statText = statText .. "\nAverage crafting cost per crafted item:"
         local averageAmountProducedPerCraft = statWeights.craftedItems.baseQuality + statWeights.craftedItems.nextQuality
+        statText = statText .. "\nAverage amount per crafted:\n"
+        valueText = valueText .. "\n" .. CraftSim.UTIL:round(averageAmountProducedPerCraft, 2) .. '\n'
+        statText = statText .. "Average crafting cost per crafted item:\n"
         local averageCraftingCostPerCraftedItem = priceData.craftingCostPerCraft / averageAmountProducedPerCraft
-        valueText = valueText .. "\n" .. CraftSim.UTIL:FormatMoney(averageCraftingCostPerCraftedItem, false)
+        valueText = valueText .. CraftSim.UTIL:FormatMoney(averageCraftingCostPerCraftedItem, false) .. "\n"
+        statText = statText .. "Average profit per item:"
+        valueText = valueText .. CraftSim.UTIL:FormatMoney(statWeights.profitPerItem, true)
         statweightFrame.content.statText:SetText(statText)
         statweightFrame.content.valueText:SetText(valueText)
     end
@@ -134,10 +138,10 @@ function CraftSim.AVERAGEPROFIT.FRAMES:UpdateExplanation(recipeData, calculation
     if calculationData.multicraft then
         profitDetailsFrame.content.multicraftInfo.currentQualityIcon.SetQuality(recipeData.expectedQuality)
         profitDetailsFrame.content.multicraftInfo.currentQualityIcon2.SetQuality(recipeData.expectedQuality)
-        
+
         profitDetailsFrame.content.multicraftInfo.averageAdditionalItemsCurrentQualityValue:SetText(CraftSim.UTIL:round(calculationData.multicraft.averageMulticraftItemsCurrent, 3))
         profitDetailsFrame.content.multicraftInfo.averageAdditionalCurrentQualityValue:SetText(CraftSim.UTIL:FormatMoney(calculationData.multicraft.averageMulticraftCurrentValue))
-        
+
         CraftSim.FRAME:ToggleFrame(profitDetailsFrame.content.multicraftInfo.higherQualityIcon, not isMaxQuality)
         CraftSim.FRAME:ToggleFrame(profitDetailsFrame.content.multicraftInfo.higherQualityIcon2, not isMaxQuality)
         CraftSim.FRAME:ToggleFrame(profitDetailsFrame.content.multicraftInfo.averageAdditionalItemsHigherQualityValue, not isMaxQuality)
@@ -153,7 +157,7 @@ function CraftSim.AVERAGEPROFIT.FRAMES:UpdateExplanation(recipeData, calculation
             profitDetailsFrame.content.multicraftInfo.averageAdditionalHigherQualityValue:SetText(CraftSim.UTIL:FormatMoney(calculationData.multicraft.averageMulticraftHigherValue))
         end
     end
-    
+
     CraftSim.FRAME:ToggleFrame(profitDetailsFrame.content.inspirationInfo, calculationData.inspiration)
     profitDetailsFrame.content.inspirationInfo.currentQualityIcon.SetQuality(recipeData.expectedQuality)
     profitDetailsFrame.content.inspirationInfo.currentQualityIcon2.SetQuality(recipeData.expectedQuality)
@@ -170,7 +174,7 @@ function CraftSim.AVERAGEPROFIT.FRAMES:UpdateExplanation(recipeData, calculation
     if  not recipeData.result.isNoQuality and not isMaxQuality then
         profitDetailsFrame.content.inspirationInfo.higherQualityIcon.SetQuality(calculationData.inspirationQuality)
         profitDetailsFrame.content.inspirationInfo.higherQualityIcon2.SetQuality(calculationData.inspirationQuality)
-        
+
         profitDetailsFrame.content.inspirationInfo.averageHigherQualityItemsValue:SetText(CraftSim.UTIL:round(calculationData.inspiration.averageInspirationItemsHigher or 0, 3))
         profitDetailsFrame.content.inspirationInfo.valueByHigherQualityItemsValue:SetText(CraftSim.UTIL:FormatMoney(calculationData.inspiration.inspirationItemsValueHigher or 0))
     end
@@ -178,33 +182,33 @@ end
 
 function CraftSim.AVERAGEPROFIT.FRAMES:InitExplanation()
     local frameNO_WO = CraftSim.FRAME:CreateCraftSimFrame(
-        "CraftSimProfitDetailsFrame", 
-        "CraftSim Average Profit Explanation", 
+        "CraftSimProfitDetailsFrame",
+        "CraftSim Average Profit Explanation",
         CraftSim.FRAME:GetFrame(CraftSim.CONST.FRAMES.STAT_WEIGHTS),
-        UIParent, 
-        "CENTER", 
-        "CENTER", 
-        0, 
-        0, 
-        1000, 
+        UIParent,
+        "CENTER",
+        "CENTER",
+        0,
+        0,
+        1000,
         600,
         CraftSim.CONST.FRAMES.PROFIT_DETAILS, false, true, "DIALOG")
 
     local frameWO = CraftSim.FRAME:CreateCraftSimFrame(
-        "CraftSimProfitDetailsWOFrame", 
-        "CraftSim Average Profit Explanation", 
+        "CraftSimProfitDetailsWOFrame",
+        "CraftSim Average Profit Explanation",
         CraftSim.FRAME:GetFrame(CraftSim.CONST.FRAMES.STAT_WEIGHTS_WORK_ORDER),
-        UIParent, 
-        "CENTER", 
-        "CENTER", 
-        0, 
-        0, 
-        1000, 
+        UIParent,
+        "CENTER",
+        "CENTER",
+        0,
+        0,
+        1000,
         600,
         CraftSim.CONST.FRAMES.PROFIT_DETAILS_WORK_ORDER, false, true, "DIALOG")
 
     local function createContent(frame, statweightFrameID)
-        frameNO_WO.closeButton:HookScript("OnClick", function(self) 
+        frameNO_WO.closeButton:HookScript("OnClick", function(self)
             CraftSim.FRAME:GetFrame(statweightFrameID).content.breakdownButton:SetText("Show Explanation")
         end)
 
@@ -222,7 +226,7 @@ function CraftSim.AVERAGEPROFIT.FRAMES:InitExplanation()
             CraftSim.UTIL:ColorizeText("The Ø value of additional items from multicraft considering inspiration and multicraft proccing together\n", blue) ..
             CraftSim.UTIL:ColorizeText("+\n", green) ..
             CraftSim.UTIL:ColorizeText("The worth of the Ø number of items gained per quality based on your inspiration\n", blue) ..
-            CraftSim.UTIL:ColorizeText("*\n", red) .. CraftSim.UTIL:ColorizeText("0.95\n", red) .. CraftSim.UTIL:ColorizeText("(5% auction house cut)\n", blue) .. 
+            CraftSim.UTIL:ColorizeText("*\n", red) .. CraftSim.UTIL:ColorizeText("0.95\n", red) .. CraftSim.UTIL:ColorizeText("(5% auction house cut)\n", blue) ..
             CraftSim.UTIL:ColorizeText("-\n", red) ..
             CraftSim.UTIL:ColorizeText("The total crafting costs based on the materials and their quality you currently selected\n", blue) ..
             CraftSim.UTIL:ColorizeText("-\n", red) ..
@@ -253,9 +257,9 @@ function CraftSim.AVERAGEPROFIT.FRAMES:InitExplanation()
         frame.content.resourcefulnessInfo.averageSavedCostsTitle = frame.content.resourcefulnessInfo:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         frame.content.resourcefulnessInfo.averageSavedCostsTitle:SetPoint("TOP", frame.content.resourcefulnessInfo.resourcefulnessTitle, "TOP", 0, contentToTitleOffsetY)
         frame.content.resourcefulnessInfo.averageSavedCostsTitle:SetText("Ø Material Costs Saved (MCS)")
-        
-        frame.content.resourcefulnessInfo.averageSavedCostsTitle.helper = CraftSim.FRAME:CreateHelpIcon(CraftSim.LOCAL:GetText(CraftSim.CONST.TEXT.RESOURCEFULNESS_EXPLANATION_TOOLTIP), 
-        frame.content.resourcefulnessInfo, frame.content.resourcefulnessInfo.averageSavedCostsTitle, 
+
+        frame.content.resourcefulnessInfo.averageSavedCostsTitle.helper = CraftSim.FRAME:CreateHelpIcon(CraftSim.LOCAL:GetText(CraftSim.CONST.TEXT.RESOURCEFULNESS_EXPLANATION_TOOLTIP),
+        frame.content.resourcefulnessInfo, frame.content.resourcefulnessInfo.averageSavedCostsTitle,
         "RIGHT", "LEFT", 0, 0)
         frame.content.resourcefulnessInfo.averageSavedCostsValue = frame.content.resourcefulnessInfo:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         frame.content.resourcefulnessInfo.averageSavedCostsValue:SetPoint("TOP", frame.content.resourcefulnessInfo.averageSavedCostsTitle, "TOP", 0, -20)
@@ -271,8 +275,8 @@ function CraftSim.AVERAGEPROFIT.FRAMES:InitExplanation()
         frame.content.multicraftInfo.averageAdditionalItemsCurrentQualityTitle:SetPoint("TOP", frame.content.multicraftInfo.multicraftTitle, "TOP", 0, contentToTitleOffsetY)
         frame.content.multicraftInfo.averageAdditionalItemsCurrentQualityTitle:SetText("Ø Additional Items (M_AI_1)")
         frame.content.multicraftInfo.currentQualityIcon = CraftSim.FRAME:CreateQualityIcon(frame.content.multicraftInfo, 20, 20, frame.content.multicraftInfo.averageAdditionalItemsCurrentQualityTitle, "LEFT", "RIGHT", 0, 0)
-        frame.content.multicraftInfo.averageAdditionalItemsCurrentQualityTitle.helper = CraftSim.FRAME:CreateHelpIcon(CraftSim.LOCAL:GetText(CraftSim.CONST.TEXT.MULTICRAFT_ADDITIONAL_ITEMS_EXPLANATION_TOOLTIP), 
-        frame.content.multicraftInfo, frame.content.multicraftInfo.averageAdditionalItemsCurrentQualityTitle, 
+        frame.content.multicraftInfo.averageAdditionalItemsCurrentQualityTitle.helper = CraftSim.FRAME:CreateHelpIcon(CraftSim.LOCAL:GetText(CraftSim.CONST.TEXT.MULTICRAFT_ADDITIONAL_ITEMS_EXPLANATION_TOOLTIP),
+        frame.content.multicraftInfo, frame.content.multicraftInfo.averageAdditionalItemsCurrentQualityTitle,
         "RIGHT", "LEFT", 0, 0)
         frame.content.multicraftInfo.averageAdditionalItemsCurrentQualityValue = frame.content.multicraftInfo:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         frame.content.multicraftInfo.averageAdditionalItemsCurrentQualityValue:SetPoint("TOP", frame.content.multicraftInfo.averageAdditionalItemsCurrentQualityTitle, "TOP", 0, -20)
@@ -281,8 +285,8 @@ function CraftSim.AVERAGEPROFIT.FRAMES:InitExplanation()
         frame.content.multicraftInfo.averageAdditionalItemsHigherQualityTitle:SetPoint("TOP", frame.content.multicraftInfo.averageAdditionalItemsCurrentQualityValue, "TOP", 0, segmentOffsetY)
         frame.content.multicraftInfo.averageAdditionalItemsHigherQualityTitle:SetText("Ø Additional Items (M_AI_2)")
         frame.content.multicraftInfo.higherQualityIcon = CraftSim.FRAME:CreateQualityIcon(frame.content.multicraftInfo, 20, 20, frame.content.multicraftInfo.averageAdditionalItemsHigherQualityTitle, "LEFT", "RIGHT", 0, 0)
-        frame.content.multicraftInfo.averageAdditionalItemsHigherQualityTitle.helper = CraftSim.FRAME:CreateHelpIcon(CraftSim.LOCAL:GetText(CraftSim.CONST.TEXT.MULTICRAFT_ADDITIONAL_ITEMS_HIGHER_QUALITY_EXPLANATION_TOOLTIP), 
-        frame.content.multicraftInfo, frame.content.multicraftInfo.averageAdditionalItemsHigherQualityTitle, 
+        frame.content.multicraftInfo.averageAdditionalItemsHigherQualityTitle.helper = CraftSim.FRAME:CreateHelpIcon(CraftSim.LOCAL:GetText(CraftSim.CONST.TEXT.MULTICRAFT_ADDITIONAL_ITEMS_HIGHER_QUALITY_EXPLANATION_TOOLTIP),
+        frame.content.multicraftInfo, frame.content.multicraftInfo.averageAdditionalItemsHigherQualityTitle,
         "RIGHT", "LEFT", 0, 0)
         frame.content.multicraftInfo.averageAdditionalItemsHigherQualityValue = frame.content.multicraftInfo:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         frame.content.multicraftInfo.averageAdditionalItemsHigherQualityValue:SetPoint("TOP", frame.content.multicraftInfo.averageAdditionalItemsHigherQualityTitle, "TOP", 0, -20)
@@ -291,19 +295,19 @@ function CraftSim.AVERAGEPROFIT.FRAMES:InitExplanation()
         frame.content.multicraftInfo.averageAdditionalValueCurrentQualityTitle:SetPoint("TOP", frame.content.multicraftInfo.averageAdditionalItemsHigherQualityValue, "TOP", 0, segmentOffsetY)
         frame.content.multicraftInfo.averageAdditionalValueCurrentQualityTitle:SetText("Ø Additional Value (M_AIV_1)")
         frame.content.multicraftInfo.currentQualityIcon2 = CraftSim.FRAME:CreateQualityIcon(frame.content.multicraftInfo, 20, 20, frame.content.multicraftInfo.averageAdditionalValueCurrentQualityTitle, "LEFT", "RIGHT", 0, 0)
-        frame.content.multicraftInfo.averageAdditionalValueCurrentQualityTitle.helper = CraftSim.FRAME:CreateHelpIcon(CraftSim.LOCAL:GetText(CraftSim.CONST.TEXT.MULTICRAFT_ADDITIONAL_ITEMS_VALUE_EXPLANATION_TOOLTIP), 
-        frame.content.multicraftInfo, frame.content.multicraftInfo.averageAdditionalValueCurrentQualityTitle, 
+        frame.content.multicraftInfo.averageAdditionalValueCurrentQualityTitle.helper = CraftSim.FRAME:CreateHelpIcon(CraftSim.LOCAL:GetText(CraftSim.CONST.TEXT.MULTICRAFT_ADDITIONAL_ITEMS_VALUE_EXPLANATION_TOOLTIP),
+        frame.content.multicraftInfo, frame.content.multicraftInfo.averageAdditionalValueCurrentQualityTitle,
         "RIGHT", "LEFT", 0, 0)
         frame.content.multicraftInfo.averageAdditionalCurrentQualityValue = frame.content.multicraftInfo:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         frame.content.multicraftInfo.averageAdditionalCurrentQualityValue:SetPoint("TOP", frame.content.multicraftInfo.averageAdditionalValueCurrentQualityTitle, "TOP", 0, -20)
         frame.content.multicraftInfo.averageAdditionalCurrentQualityValue:SetText(CraftSim.UTIL:FormatMoney(0))
-        
+
         frame.content.multicraftInfo.averageAdditionalValueHigherQualityTitle = frame.content.multicraftInfo:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         frame.content.multicraftInfo.averageAdditionalValueHigherQualityTitle:SetPoint("TOP", frame.content.multicraftInfo.averageAdditionalCurrentQualityValue, "TOP", 0, segmentOffsetY)
         frame.content.multicraftInfo.averageAdditionalValueHigherQualityTitle:SetText("Ø Additional Value (M_AIV_2)")
         frame.content.multicraftInfo.higherQualityIcon2 = CraftSim.FRAME:CreateQualityIcon(frame.content.multicraftInfo, 20, 20, frame.content.multicraftInfo.averageAdditionalValueHigherQualityTitle, "LEFT", "RIGHT", 0, 0)
-        frame.content.multicraftInfo.averageAdditionalValueHigherQualityTitle.helper = CraftSim.FRAME:CreateHelpIcon(CraftSim.LOCAL:GetText(CraftSim.CONST.TEXT.MULTICRAFT_ADDITIONAL_ITEMS_HIGHER_VALUE_EXPLANATION_TOOLTIP), 
-        frame.content.multicraftInfo, frame.content.multicraftInfo.averageAdditionalValueHigherQualityTitle, 
+        frame.content.multicraftInfo.averageAdditionalValueHigherQualityTitle.helper = CraftSim.FRAME:CreateHelpIcon(CraftSim.LOCAL:GetText(CraftSim.CONST.TEXT.MULTICRAFT_ADDITIONAL_ITEMS_HIGHER_VALUE_EXPLANATION_TOOLTIP),
+        frame.content.multicraftInfo, frame.content.multicraftInfo.averageAdditionalValueHigherQualityTitle,
         "RIGHT", "LEFT", 0, 0)
         frame.content.multicraftInfo.averageAdditionalHigherQualityValue = frame.content.multicraftInfo:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         frame.content.multicraftInfo.averageAdditionalHigherQualityValue:SetPoint("TOP", frame.content.multicraftInfo.averageAdditionalValueHigherQualityTitle, "TOP", 0, -20)
@@ -319,50 +323,50 @@ function CraftSim.AVERAGEPROFIT.FRAMES:InitExplanation()
         frame.content.inspirationInfo.averageCurrentQualityItemsTitle:SetPoint("TOP", frame.content.inspirationInfo.inspirationTitle, "TOP", 0, contentToTitleOffsetY)
         frame.content.inspirationInfo.averageCurrentQualityItemsTitle:SetText("Ø Items (I_I_1)")
         frame.content.inspirationInfo.currentQualityIcon = CraftSim.FRAME:CreateQualityIcon(frame.content.inspirationInfo, 20, 20, frame.content.inspirationInfo.averageCurrentQualityItemsTitle, "LEFT", "RIGHT", 0, 0)
-        frame.content.inspirationInfo.averageCurrentQualityItemsTitle.helper = CraftSim.FRAME:CreateHelpIcon(CraftSim.LOCAL:GetText(CraftSim.CONST.TEXT.INSPIRATION_ADDITIONAL_ITEMS_EXPLANATION_TOOLTIP), 
-        frame.content.inspirationInfo, frame.content.inspirationInfo.averageCurrentQualityItemsTitle, 
+        frame.content.inspirationInfo.averageCurrentQualityItemsTitle.helper = CraftSim.FRAME:CreateHelpIcon(CraftSim.LOCAL:GetText(CraftSim.CONST.TEXT.INSPIRATION_ADDITIONAL_ITEMS_EXPLANATION_TOOLTIP),
+        frame.content.inspirationInfo, frame.content.inspirationInfo.averageCurrentQualityItemsTitle,
         "RIGHT", "LEFT", 0, 0)
         frame.content.inspirationInfo.averageCurrentQualityItemsValue = frame.content.inspirationInfo:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         frame.content.inspirationInfo.averageCurrentQualityItemsValue:SetPoint("TOP", frame.content.inspirationInfo.averageCurrentQualityItemsTitle, "TOP", 0, -20)
         frame.content.inspirationInfo.averageCurrentQualityItemsValue:SetText("0")
-        
+
         frame.content.inspirationInfo.averageHigherQualityItemsTitle = frame.content.inspirationInfo:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         frame.content.inspirationInfo.averageHigherQualityItemsTitle:SetPoint("TOP", frame.content.inspirationInfo.averageCurrentQualityItemsValue, "TOP", 0, segmentOffsetY)
         frame.content.inspirationInfo.averageHigherQualityItemsTitle:SetText("Ø Items (I_I_2)")
         frame.content.inspirationInfo.higherQualityIcon = CraftSim.FRAME:CreateQualityIcon(frame.content.inspirationInfo, 20, 20, frame.content.inspirationInfo.averageHigherQualityItemsTitle, "LEFT", "RIGHT", 0, 0)
-        frame.content.inspirationInfo.averageHigherQualityItemsTitle.helper = CraftSim.FRAME:CreateHelpIcon(CraftSim.LOCAL:GetText(CraftSim.CONST.TEXT.INSPIRATION_ADDITIONAL_ITEMS_HIGHER_QUALITY_EXPLANATION_TOOLTIP), 
-        frame.content.inspirationInfo, frame.content.inspirationInfo.averageHigherQualityItemsTitle, 
+        frame.content.inspirationInfo.averageHigherQualityItemsTitle.helper = CraftSim.FRAME:CreateHelpIcon(CraftSim.LOCAL:GetText(CraftSim.CONST.TEXT.INSPIRATION_ADDITIONAL_ITEMS_HIGHER_QUALITY_EXPLANATION_TOOLTIP),
+        frame.content.inspirationInfo, frame.content.inspirationInfo.averageHigherQualityItemsTitle,
         "RIGHT", "LEFT", 0, 0)
         frame.content.inspirationInfo.averageHigherQualityItemsValue = frame.content.inspirationInfo:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         frame.content.inspirationInfo.averageHigherQualityItemsValue:SetPoint("TOP", frame.content.inspirationInfo.averageHigherQualityItemsTitle, "TOP", 0, -20)
         frame.content.inspirationInfo.averageHigherQualityItemsValue:SetText("0")
-        
+
         frame.content.inspirationInfo.valueByCurrentQualityItemsTitle = frame.content.inspirationInfo:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         frame.content.inspirationInfo.valueByCurrentQualityItemsTitle:SetPoint("TOP", frame.content.inspirationInfo.averageHigherQualityItemsValue, "TOP", 0, segmentOffsetY)
         frame.content.inspirationInfo.valueByCurrentQualityItemsTitle:SetText("Ø Value (I_V_1)")
         frame.content.inspirationInfo.currentQualityIcon2 = CraftSim.FRAME:CreateQualityIcon(frame.content.inspirationInfo, 20, 20, frame.content.inspirationInfo.valueByCurrentQualityItemsTitle, "LEFT", "RIGHT", 0, 0)
-        frame.content.inspirationInfo.valueByCurrentQualityItemsTitle.helper = CraftSim.FRAME:CreateHelpIcon(CraftSim.LOCAL:GetText(CraftSim.CONST.TEXT.INSPIRATION_ADDITIONAL_ITEMS_VALUE_EXPLANATION_TOOLTIP), 
-        frame.content.inspirationInfo, frame.content.inspirationInfo.valueByCurrentQualityItemsTitle, 
+        frame.content.inspirationInfo.valueByCurrentQualityItemsTitle.helper = CraftSim.FRAME:CreateHelpIcon(CraftSim.LOCAL:GetText(CraftSim.CONST.TEXT.INSPIRATION_ADDITIONAL_ITEMS_VALUE_EXPLANATION_TOOLTIP),
+        frame.content.inspirationInfo, frame.content.inspirationInfo.valueByCurrentQualityItemsTitle,
         "RIGHT", "LEFT", 0, 0)
         frame.content.inspirationInfo.valueByCurrentQualityItemsValue = frame.content.inspirationInfo:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         frame.content.inspirationInfo.valueByCurrentQualityItemsValue:SetPoint("TOP", frame.content.inspirationInfo.valueByCurrentQualityItemsTitle, "TOP", 0, -20)
         frame.content.inspirationInfo.valueByCurrentQualityItemsValue:SetText(CraftSim.UTIL:FormatMoney(0))
-        
+
         frame.content.inspirationInfo.valueByHigherQualityItemsTitle = frame.content.inspirationInfo:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         frame.content.inspirationInfo.valueByHigherQualityItemsTitle:SetPoint("TOP", frame.content.inspirationInfo.valueByCurrentQualityItemsValue, "TOP", 0, segmentOffsetY)
         frame.content.inspirationInfo.valueByHigherQualityItemsTitle:SetText("Ø Value (I_V_2)")
         frame.content.inspirationInfo.higherQualityIcon2 = CraftSim.FRAME:CreateQualityIcon(frame.content.inspirationInfo, 20, 20, frame.content.inspirationInfo.valueByHigherQualityItemsTitle, "LEFT", "RIGHT", 0, 0)
-        frame.content.inspirationInfo.valueByHigherQualityItemsTitle.helper = CraftSim.FRAME:CreateHelpIcon(CraftSim.LOCAL:GetText(CraftSim.CONST.TEXT.INSPIRATION_ADDITIONAL_ITEMS_HIGHER_VALUE_EXPLANATION_TOOLTIP), 
-        frame.content.inspirationInfo, frame.content.inspirationInfo.valueByHigherQualityItemsTitle, 
+        frame.content.inspirationInfo.valueByHigherQualityItemsTitle.helper = CraftSim.FRAME:CreateHelpIcon(CraftSim.LOCAL:GetText(CraftSim.CONST.TEXT.INSPIRATION_ADDITIONAL_ITEMS_HIGHER_VALUE_EXPLANATION_TOOLTIP),
+        frame.content.inspirationInfo, frame.content.inspirationInfo.valueByHigherQualityItemsTitle,
         "RIGHT", "LEFT", 0, 0)
         frame.content.inspirationInfo.valueByHigherQualityItemsValue = frame.content.inspirationInfo:CreateFontString(nil, "OVERLAY", "GameFontHighlight")
         frame.content.inspirationInfo.valueByHigherQualityItemsValue:SetPoint("TOP", frame.content.inspirationInfo.valueByHigherQualityItemsTitle, "TOP", 0, -20)
         frame.content.inspirationInfo.valueByHigherQualityItemsValue:SetText(CraftSim.UTIL:FormatMoney(0))
         frame.content.hideButton = CreateFrame("Button", nil, frame.content, "UIPanelButtonTemplate")
-        frame.content.hideButton:SetPoint("BOTTOM", frame.content, "BOTTOM", 0, 20)	
+        frame.content.hideButton:SetPoint("BOTTOM", frame.content, "BOTTOM", 0, 20)
         frame.content.hideButton:SetText("Close")
         frame.content.hideButton:SetSize(frame.content.hideButton:GetTextWidth()+15, 25)
-        frame.content.hideButton:SetScript("OnClick", function(self) 
+        frame.content.hideButton:SetScript("OnClick", function(self)
             CraftSim.FRAME:ToggleFrame(frame, false)
             CraftSim.FRAME:GetFrame(statweightFrameID).content.breakdownButton:SetText("Show Explanation")
         end)

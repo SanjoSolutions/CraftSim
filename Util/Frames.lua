@@ -34,6 +34,38 @@ function CraftSim.FRAME:CreateIcon(parent, offsetX, offsetY, texture, sizeX, siz
 	newIcon:SetNormalFontObject("GameFontNormalLarge")
 	newIcon:SetHighlightFontObject("GameFontHighlightLarge")
 	newIcon:SetNormalTexture(texture)
+
+    newIcon.SetItem = function(itemIDOrLink, tooltipOwner, tooltipAnchor, byLink)
+        if itemIDOrLink then
+
+            local item = nil
+            if byLink then
+                item = Item:CreateFromItemLink(itemIDOrLink)
+            else
+                item = Item:CreateFromItemID(itemIDOrLink)
+            end
+
+            item:ContinueOnItemLoad(function ()
+                newIcon:SetNormalTexture(item:GetItemIcon())
+                newIcon:SetScript("OnEnter", function(self) 
+                    local itemName, ItemLink = GameTooltip:GetItem()
+                    GameTooltip:SetOwner(tooltipOwner or newIcon, tooltipAnchor or "ANCHOR_RIGHT");
+                    if ItemLink ~= item:GetItemLink() then
+                        -- to not set it again and hide the tooltip..
+                        GameTooltip:SetHyperlink(item:GetItemLink())
+                    end
+                    GameTooltip:Show();
+                end)
+                newIcon:SetScript("OnLeave", function(self) 
+                    GameTooltip:Hide();
+                end)
+            end)
+        else
+            newIcon:SetScript("OnEnter", nil)
+            newIcon:SetScript("OnLeave", nil)
+        end
+    end
+
     return newIcon
 end
 
@@ -298,12 +330,38 @@ function CraftSim.FRAME:CreateText(text, parent, anchorParent, anchorA, anchorB,
     if justifyData then
         if justifyData.type == "V" then
             craftSimText:SetJustifyV(justifyData.value)
-        else
+        elseif justifyData.type == "H" then
             craftSimText:SetJustifyH(justifyData.value)
+        elseif justifyData.type == "HV" then
+            craftSimText:SetJustifyH(justifyData.valueH)
+            craftSimText:SetJustifyV(justifyData.valueV)
         end
     end
 
     return craftSimText
+end
+
+function CraftSim.FRAME:CreateScrollingMessageFrame(parent, anchorParent, anchorA, anchorB, anchorX, anchorY, maxLines, sizeX, sizeY)
+    local scrollingFrame = CreateFrame("ScrollingMessageFrame", nil, parent)
+    scrollingFrame:SetSize(sizeX, sizeY)
+    scrollingFrame:SetPoint(anchorA, anchorParent, anchorB, anchorX, anchorY)
+    scrollingFrame:SetFontObject(GameFontHighlight)
+    if maxLines then
+        scrollingFrame:SetMaxLines(maxLines)
+    end
+    scrollingFrame:SetFading(false) -- make optional
+    scrollingFrame:SetJustifyH("LEFT")
+    scrollingFrame:EnableMouseWheel(true)
+
+    scrollingFrame:SetScript("OnMouseWheel", function(self, delta)
+        if delta > 0 then
+          scrollingFrame:ScrollUp()
+        elseif delta < 0 then
+          scrollingFrame:ScrollDown()
+        end
+      end)
+
+    return scrollingFrame
 end
 
 function CraftSim.FRAME:CreateCraftSimFrame(name, title, parent, anchorFrame, anchorA, anchorB, offsetX, offsetY, sizeX, sizeY, 
@@ -633,7 +691,8 @@ function CraftSim.FRAME:InitWarningFrame()
     frame.content.warningText:Hide()
     frame.content.errorBox:Hide()
 
-    frame.showWarning = function(warningText, optionalTitle) 
+    frame.showWarning = function(warningText, optionalTitle, hideDoNotShowButton) 
+        CraftSim.FRAME:ToggleFrame(frame.content.doNotShowAgainButton, not hideDoNotShowButton)
         optionalTitle = optionalTitle or "CraftSim Warning"
         local wrapped = CraftSim.UTIL:WrapText(warningText, 50)
         frame.title:SetText(CraftSim.UTIL:ColorizeText(optionalTitle, CraftSim.CONST.COLORS.RED))
@@ -721,9 +780,9 @@ function CraftSim.FRAME:ShowOneTimeInfo(force)
     infoFrame.showInfo(infoText)
 end
 
-function CraftSim.FRAME:ShowWarning(warningText, optionalTitle)
+function CraftSim.FRAME:ShowWarning(warningText, optionalTitle, hideBtn)
     local warningFrame = CraftSim.FRAME:GetFrame(CraftSim.CONST.FRAMES.WARNING)
-    warningFrame.showWarning(warningText, optionalTitle)
+    warningFrame.showWarning(warningText, optionalTitle, hideBtn)
 end
 
 function CraftSim.FRAME:ShowError(errorText, optionalTitle)
@@ -796,7 +855,6 @@ function CraftSim.FRAME:CreateInput(name, parent, anchorParent, anchorA, anchorB
         if onTextChangedCallback then
             numericInput:SetScript("OnTextChanged", onTextChangedCallback)
         end
-
 
     return numericInput
 end

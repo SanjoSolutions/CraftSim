@@ -21,6 +21,37 @@ function CraftSim.NEWS:GET_NEWS()
     return 
         c("                   Hello and thank you for using CraftSim!\n", bb) .. 
         c("                                 ( You are awesome! )", bb) ..
+        newP("6.1") ..
+        P .. "Auto Reply now can take a third argument <ilvl> to specify the" ..
+        a .. "target item level. It checks which infusion or matrix" ..
+        a .. "it has to use to reach this itemlevel and then sims the recipe" ..
+        a .. "with it in mind" ..
+        p .. "Added a command preview to the Auto Reply Tab in the " .. 
+        a .. "Customer Service Module to show its syntax" ..
+        newP("6.0.1") ..
+        p .. "Fixed an error due to the Craft Result statistics display" ..
+        p .. "Utilizing ContinueOnItemLoad to lazy load the item links" .. 
+        a .. "in the Cost Overview Module" ..
+        newP("6.0.0") ..
+        P .. "New Module: " .. c("Customer Service", g) ..
+        a .. "New Feature: " .. c("Automatic Reply", g) .. " and" ..
+        a .. "New Feature: " .. c("Live Crafting Preview", g) ..
+        a .. "Send someone who has CraftSim an invite link to browse" ..
+        a .. "your recipes and possible results in a live session!" ..
+        a .. "For now it has some basic features and always optimizes for" ..
+        a .. "Inspiration, but many more features will come :)" ..
+        newP("5.5.6") ..
+        s .. c("Real / Expected Number of Procs Comparison", g) .. " in Craft Results" ..
+        p .. "Fixed Leatherworking Experimental Data not" .. 
+        a .. "recognizing some patterns" .. 
+        p .. "Owned number of commodities is now shown in" .. 
+        a .. "the " .. c("Cost Overview Module", bb) ..
+        newP("5.5.5") ..
+        p .. "Jewelcrafting Experimental Data fix by " .. c("github.com/SanjoSolutions", bb) ..
+        p .. "zhTW Translations added by " .. c("github.com/wxpenpen", bb) ..
+        newP("5.5.4") ..
+        p .. "The Craft Log of the Craft Results Module now uses" ..
+        a .. "the ScrollingMessageFrame template to ensure infinite scrolling" ..
         newP("5.5.3") ..
         p .. "Fixed an error occuring for non experimental data recipes" .. 
         a .. "when parsing spec data" ..

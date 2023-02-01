@@ -3,7 +3,7 @@ _, CraftSim = ...
 CraftSim.CONST = {}
 
 -- One Time Info ------------
-CraftSim.CONST.currentInfoVersionID = 30 -- last patch increase: 5.5.3 - 30
+CraftSim.CONST.currentInfoVersionID = 36 -- last patch increase: 6.1 - 36
 CraftSim.CONST.debugInfoText = false
 CraftSim.CONST.infoBoxSizeX = 500
 CraftSim.CONST.infoBoxSizeY = 400
@@ -45,6 +45,8 @@ CraftSim.CONST.FRAMES = {
     RECIPE_SCAN = 20,
     CRAFT_RESULTS = 21,
     STATISTICS = 22,
+    CUSTOMER_SERVICE = 23,
+    LIVE_PREVIEW = 24,
 }
 
 CraftSim.CONST.DRAGON_ISLES_CATEGORY_IDS = {
@@ -77,6 +79,7 @@ CraftSim.CONST.DEBUG_IDS = {
     AVERAGE_PROFIT = "AVERAGE_PROFIT",
     STATISTICS = "STATISTICS",
     CUSTOMER_SERVICE = "CUSTOMER_SERVICE",
+    COMM = "COMM",
 }
 
 CraftSim.CONST.ERROR = {
@@ -298,7 +301,7 @@ CraftSim.CONST.RECIPE_ITEM_SUBTYPES = {
         MISC = 0, -- trinket
     },
     LEATHERWORKING = {
-        OTHER = 8, -- Drums
+        DRUMS = 8, -- Drums
         MISC = 14, -- Armor Kits
         MISCELLANEOUS = 0, -- Witherrot Tome
         OTHER = 4, -- Toys
@@ -322,7 +325,7 @@ CraftSim.CONST.RECIPE_ITEM_SUBTYPES = {
 
         -- Reagents
         OPTIONAL_REAGENTS = 18, -- Fang Adornments, Toxified Armor Patch (Optional Reagents)
-        LEATHER = 6, -- Hides, Scales (Reagents)
+        LEATHER_REAGENTS = 6, -- Hides, Scales (Reagents)
     },
     INSCRIPTION = {
         INKS = 16, -- "Inscription"
@@ -367,7 +370,6 @@ CraftSim.CONST.TEXT = {
     RECIPE_DIFFICULTY_EXPLANATION_TOOLTIP = 13,
     INSPIRATION_EXPLANATION_TOOLTIP = 14,
     MULTICRAFT_EXPLANATION_TOOLTIP = 15,
-    RESOURCEFULNESS_EXPLANATION_TOOLTIP = 16,
     REAGENTSKILL_EXPLANATION_TOOLTIP = 17,
     
     -- required stuff
@@ -376,7 +378,6 @@ CraftSim.CONST.TEXT = {
     STAT_RESOURCEFULNESS = 20,
     STAT_CRAFTINGSPEED = 21,
     EQUIP_MATCH_STRING = 22,
-    INSPIRATIONBONUS_SKILL_ITEM_MATCH_STRING = 23,
     ENCHANTED_MATCH_STRING = 24,
     --
 
@@ -401,7 +402,10 @@ CraftSim.CONST.TEXT = {
     MISSING_SKILL_LABEL = 40,
     MISSING_SKILL_INSPIRATION_LABEL = 41,
     SKILL_LABEL = 42,
-    MULTICRAFT_BONUS_LABEL = 43	
+    MULTICRAFT_BONUS_LABEL = 43,
+    CUSTOMER_SERVICE_AUTO_REPLY_FORMAT_EXPLANATION = 44,
+    CUSTOMER_SERVICE_LIVE_PREVIEW_EXPLANATION = 45,
+    CUSTOMER_SERVICE_AUTO_REPLY_EXPLANATION = 46,
 }
 
 CraftSim.CONST.IMPLEMENTED_SKILL_BUILD_UP = function() 
@@ -414,4 +418,10 @@ CraftSim.CONST.ITEM_ID_EXCEPTION_MAPPING = {
 
 CraftSim.CONST.EXCEPTION_ORDER_ITEM_IDS = {
     [382363] = {198236, 198237, 198238}
+}
+
+CraftSim.CONST.SPECIAL_TOOL_STATS = {
+    [191228] = { -- Epic BS Hammer
+        inspirationBonusSkillPercent = 0.15,
+    }
 }

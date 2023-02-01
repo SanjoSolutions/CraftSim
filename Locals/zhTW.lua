@@ -11,7 +11,6 @@ function CraftSim.LOCAL_TW:GetData()
         [CraftSim.CONST.TEXT.STAT_CRAFTINGSPEED] = "製造速度",
         [CraftSim.CONST.TEXT.EQUIP_MATCH_STRING] = "裝備：",
         [CraftSim.CONST.TEXT.ENCHANTED_MATCH_STRING] = "附魔：",
-        [CraftSim.CONST.TEXT.INSPIRATIONBONUS_SKILL_ITEM_MATCH_STRING] = "在製作期間獲得靈感時，提高所提供的的技能",
 
         -- OPTIONAL (Defaulting to EN if not available):
         -- Other Statnames
@@ -48,7 +47,14 @@ function CraftSim.LOCAL_TW:GetData()
         [CraftSim.CONST.TEXT.INSPIRATION_SKILL_LABEL] = "靈感技能：",
         [CraftSim.CONST.TEXT.MULTICRAFT_LABEL] = "複數製造：",
         [CraftSim.CONST.TEXT.RESOURCEFULNESS_LABEL] = "精明：",
-		
-
+        [CraftSim.CONST.TEXT.RESOURCEFULNESS_BONUS_LABEL] = "精明節省加成: ",
+        [CraftSim.CONST.TEXT.MATERIAL_QUALITY_BONUS_LABEL] = "材料品質加成: ",
+        [CraftSim.CONST.TEXT.MATERIAL_QUALITY_MAXIMUM_LABEL] = "材料品質最大佔比: ",
+        [CraftSim.CONST.TEXT.EXPECTED_QUALITY_LABEL] = "預期品質: ",
+        [CraftSim.CONST.TEXT.NEXT_QUALITY_LABEL] = "下一級品質: ",
+        [CraftSim.CONST.TEXT.MISSING_SKILL_LABEL] = "不足技能: ",
+        [CraftSim.CONST.TEXT.MISSING_SKILL_INSPIRATION_LABEL] = "不足技能 (靈感)",
+        [CraftSim.CONST.TEXT.SKILL_LABEL] = "技能: ",
+        [CraftSim.CONST.TEXT.MULTICRAFT_BONUS_LABEL] = "複數製造加成: "
     }
 end

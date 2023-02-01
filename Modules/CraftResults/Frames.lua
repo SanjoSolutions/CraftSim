@@ -26,20 +26,64 @@ function CraftSim.CRAFT_RESULTS.FRAMES:UpdateRecipeData(recipeID)
     local actualProfit = CraftSim.UTIL:FormatMoney(recipeCraftData.profit, true)
     statisticsText = statisticsText .. "Crafts: " .. statistics.crafts .. "\n\n"
     statisticsText = statisticsText .. "Expected Ø Profit: " .. expectedAverageProfit .. "\n"
-    statisticsText = statisticsText .. "Actual Ø Profit: " .. actualAverageProfit .. "\n"
-    statisticsText = statisticsText .. "Actual Profit: " .. actualProfit .. "\n\n"
-    statisticsText = statisticsText .. "Procs:\n\n"
+    statisticsText = statisticsText .. "Real Ø Profit: " .. actualAverageProfit .. "\n"
+    statisticsText = statisticsText .. "Real Profit: " .. actualProfit .. "\n\n"
+    statisticsText = statisticsText .. "Procs - Real / Expected:\n\n"
 
     if statistics.inspiration then
-        statisticsText = statisticsText .. "Inspiration: " .. statistics.inspiration .. "\n"
+        local expectedProcs = 0
+        if CraftSim.MAIN.currentRecipeData.stats.inspiration then
+            expectedProcs = tonumber(CraftSim.UTIL:round((CraftSim.MAIN.currentRecipeData.stats.inspiration.percent / 100) * statistics.crafts, 1)) or 0
+        end
+        if statistics.inspiration >= expectedProcs then
+            statisticsText = statisticsText .. "Inspiration: " .. CraftSim.UTIL:ColorizeText(statistics.inspiration, CraftSim.CONST.COLORS.GREEN) .. " / " .. expectedProcs .. "\n"
+        else
+            statisticsText = statisticsText .. "Inspiration: " .. CraftSim.UTIL:ColorizeText(statistics.inspiration, CraftSim.CONST.COLORS.RED) .. " / " .. expectedProcs .. "\n"
+        end
     end
     if statistics.multicraft then
-        statisticsText = statisticsText .. "Multicraft: " .. statistics.multicraft .. "\n"
-        local averageExtraItems = CraftSim.UTIL:round(( statistics.multicraft > 0 and (statistics.multicraftExtraItems / statistics.multicraft)) or 0, 2)
-        statisticsText = statisticsText .. "- Ø Extra Items: " .. averageExtraItems .. "\n"
+        local expectedProcs = 0
+        if CraftSim.MAIN.currentRecipeData.stats.multicraft then
+            expectedProcs = tonumber(CraftSim.UTIL:round((CraftSim.MAIN.currentRecipeData.stats.multicraft.percent / 100) * statistics.crafts, 1)) or 0
+        end
+        if statistics.multicraft >= expectedProcs then
+            statisticsText = statisticsText .. "Multicraft: " .. CraftSim.UTIL:ColorizeText(statistics.multicraft, CraftSim.CONST.COLORS.GREEN) .. " / " .. expectedProcs .. "\n"
+        else
+            statisticsText = statisticsText .. "Multicraft: " .. CraftSim.UTIL:ColorizeText(statistics.multicraft, CraftSim.CONST.COLORS.RED) .. " / " .. expectedProcs .. "\n"
+        end
+        local averageExtraItems = 0
+        local expectedAdditionalItems = 0
+        if CraftSim.MAIN.currentRecipeData.stats.multicraft then
+            local multicraftExtraItemsFactor = 1
+            if CraftSim.MAIN.currentRecipeData.specNodeData then
+                multicraftExtraItemsFactor = 1 + CraftSim.MAIN.currentRecipeData.stats.multicraft.bonusItemsFactor
+            else
+                multicraftExtraItemsFactor = CraftSim.MAIN.currentRecipeData.extraItemFactors.multicraftExtraItemsFactor
+            end
+    
+            local maxExtraItems = (2.5*CraftSim.MAIN.currentRecipeData.baseItemAmount) * multicraftExtraItemsFactor
+            expectedAdditionalItems = tonumber(CraftSim.UTIL:round((1 + maxExtraItems) / 2, 2)) or 0
+    
+            averageExtraItems = tonumber(CraftSim.UTIL:round(( statistics.multicraft > 0 and (statistics.multicraftExtraItems / statistics.multicraft)) or 0, 2)) or 0
+        end
+        if averageExtraItems == 0 then
+            statisticsText = statisticsText .. "- Ø Extra Items: " .. averageExtraItems .. " / " .. expectedAdditionalItems .. "\n"
+        elseif averageExtraItems >= expectedAdditionalItems then
+            statisticsText = statisticsText .. "- Ø Extra Items: " .. CraftSim.UTIL:ColorizeText(averageExtraItems, CraftSim.CONST.COLORS.GREEN) .. " / " .. expectedAdditionalItems .. "\n"
+        else
+            statisticsText = statisticsText .. "- Ø Extra Items: " .. CraftSim.UTIL:ColorizeText(averageExtraItems, CraftSim.CONST.COLORS.RED) .. " / " .. expectedAdditionalItems .. "\n"
+        end
     end
     if statistics.resourcefulness then
-        statisticsText = statisticsText .. "Resourcefulness: " .. statistics.resourcefulness .. "\n"
+        local expectedProcs = 0
+        if CraftSim.MAIN.currentRecipeData.stats.resourcefulness then
+            expectedProcs = tonumber(CraftSim.UTIL:round((CraftSim.MAIN.currentRecipeData.stats.resourcefulness.percent / 100) * statistics.crafts, 1)) or 0
+        end
+        if statistics.resourcefulness >= expectedProcs then
+            statisticsText = statisticsText .. "Resourcefulness: " .. CraftSim.UTIL:ColorizeText(statistics.resourcefulness, CraftSim.CONST.COLORS.GREEN) .. " / " .. expectedProcs .. "\n"
+        else
+            statisticsText = statisticsText .. "Resourcefulness: " .. CraftSim.UTIL:ColorizeText(statistics.resourcefulness, CraftSim.CONST.COLORS.RED) .. " / " .. expectedProcs .. "\n"
+        end
     end
 
     craftResultFrame.content.statisticsText:SetText(statisticsText)
@@ -63,7 +107,7 @@ function CraftSim.CRAFT_RESULTS.FRAMES:Init()
         frame.content.clearButton = CraftSim.FRAME:CreateButton("Reset Data", frame.content, frame.content.totalProfitAllTitle, "TOPLEFT", "BOTTOMLEFT", 
         0, -40, 15, 25, true, function() 
             CraftSim.CRAFT_RESULTS:ResetData()
-            frame.content.resultFrame.resultFeed:SetText("")
+            frame.content.scrollingMessageFrame:Clear()
             frame.content.craftedItemsFrame.resultFeed:SetText("")
             frame.content.totalProfitAllValue:SetText(CraftSim.UTIL:FormatMoney(0, true))
             CraftSim.CRAFT_RESULTS.FRAMES:UpdateRecipeData(CraftSim.MAIN.currentRecipeData.recipeID)
@@ -75,20 +119,14 @@ function CraftSim.CRAFT_RESULTS.FRAMES:Init()
             CraftSim.UTIL:KethoEditBox_Show(csvData)
         end)
 
+        
         -- craft results
-        frame.content.scrollFrame, frame.content.resultFrame = CraftSim.FRAME:CreateScrollFrame(frame.content, -50, 20, -350, 250)
 
-        frame.content.craftsTitle = CraftSim.FRAME:CreateText("Craft Log", frame.content, frame.content.scrollFrame, "BOTTOM", "TOP", 0, 0)
-
-        -- always scroll down on new craft
-        frame.content.scrollFrame:HookScript("OnScrollRangeChanged", function() 
-            frame.content.scrollFrame:SetVerticalScroll(frame.content.scrollFrame:GetVerticalScrollRange())
-        end)
-
-        frame.content.resultFrame.resultFeed = CraftSim.FRAME:CreateText("", frame.content.resultFrame, frame.content.resultFrame, 
-            "TOPLEFT", "TOPLEFT", 10, -10, nil, nil, {type="H", value="LEFT"})
-            frame.content.resultFrame.resultFeed:SetWidth(frame.content.resultFrame:GetWidth() - 5)
-        frame.content.resultFrame.resultFeed:SetText("")
+        frame.content.craftsTitle = CraftSim.FRAME:CreateText("Craft Log", frame.content, frame.content, "TOPLEFT", "TOPLEFT", 155, -40)
+        
+        frame.content.scrollingMessageFrame = CraftSim.FRAME:CreateScrollingMessageFrame(frame.content, frame.content.craftsTitle, 
+        "TOPLEFT", "BOTTOMLEFT", -125, -15, 30, 200, 140)
+        --
 
         frame.content.scrollFrame2, frame.content.craftedItemsFrame = CraftSim.FRAME:CreateScrollFrame(frame.content, -230, 20, -350, 20)
 

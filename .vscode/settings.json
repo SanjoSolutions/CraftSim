@@ -30,6 +30,8 @@
         "Auctionator",
         "addonName",
         "TSM_API",
-        "ChatFrame_AddMessageEventFilter"
+        "ChatFrame_AddMessageEventFilter",
+        "CloseDropDownMenus",
+        "UIDropDownMenu_SetEnabled"
     ]
 }

@@ -45,14 +45,16 @@ end
 
 function CraftSim.CUSTOMER_SERVICE:OnPreviewLinkClicked(payload, text, button)
     local splitData = strsplittable(":", payload)
+    local header = splitData[1]
     local crafter = splitData[2]
     local professionID = splitData[3]
     local professionName = splitData[4]
     local previewID = splitData[5]
 
-    -- TODO: Send initial request to get possible recipes (id + names) of learned!
-    -- TODO: open crafting preview and populate dropdown and other fields
-    -- TODO: set some local property to the crafter to continuosly send data to and receive
+    if header ~= "CraftSimLivePreview" then
+        return
+    end
+
     -- TODO: if any request fails / times out show some small warning indicator (offline or in loading screen)
 
     print("Requesting Live Preview: " .. tostring(crafter) .. " professionID: " .. tostring(professionID))
@@ -60,6 +62,7 @@ function CraftSim.CUSTOMER_SERVICE:OnPreviewLinkClicked(payload, text, button)
 
     --CraftSim.CUSTOMER_SERVICE.FRAMES:ShowLivePreview()
     CraftSim.CUSTOMER_SERVICE:SendPreviewRequest(crafter, previewID, professionID, professionName)
+    CraftSim.CUSTOMER_SERVICE:StartLivePreviewUpdating()
 end
 
 function CraftSim.CUSTOMER_SERVICE:SendPreviewRequest(crafter, previewID, professionID, professionName)
@@ -71,8 +74,8 @@ function CraftSim.CUSTOMER_SERVICE:SendPreviewRequest(crafter, previewID, profes
         addonVersion = GetAddOnMetadata(AddonName, "Version"),
     }
     print("SendPreviewRequest " .. tostring(crafter))
-    print("Payload: ")
-    print(requestData, true)
+    -- print("Payload: ")
+    -- print(requestData, true)
     CraftSim.COMM:SendData(PREVIEW_REQUEST_PREFIX, requestData, "WHISPER", crafter)
 end
 
@@ -117,7 +120,8 @@ function CraftSim.CUSTOMER_SERVICE.OnPreviewRequest(payload)
             local isRelevantItemLevel = recipeInfo.itemLevel > 1 
             if isDragonIsleRecipe and isRelevantItemLevel then
                 local iconAsText = CraftSim.UTIL:IconToText(recipeInfo.icon, 20)
-                table.insert(response.recipes, {
+                response.recipes[recipeCategoryInfo.name] = response.recipes[recipeCategoryInfo.name] or {}
+                table.insert(response.recipes[recipeCategoryInfo.name], {
                     recipeID=recipeID,
                     recipeName= iconAsText .. " " .. recipeInfo.name
                 })
@@ -142,23 +146,40 @@ function CraftSim.CUSTOMER_SERVICE.OnRecipeListResponse(payload)
         print("Available Recipes: " .. tostring(#payload.recipes))
     else
         print("No recipes received!")
+        return
     end
-    print(payload.recipes, true)
 
     CraftSim.CUSTOMER_SERVICE.FRAMES:InitLivePreviewSession(payload)
+    CraftSim.CUSTOMER_SERVICE:StopLivePreviewUpdating()
 end
 
-function CraftSim.CUSTOMER_SERVICE.SendRecipeUpdateRequest(recipeID) -- TODO: optional reagents, materials?
+function CraftSim.CUSTOMER_SERVICE.SendRecipeUpdateRequest(recipeID, isInit)
     local previewFrame = CraftSim.FRAME:GetFrame(CraftSim.CONST.FRAMES.LIVE_PREVIEW)
 
+    local optionalReagents = nil
+    if not isInit then
+        -- gather optionalReagents and send back to use
+        optionalReagents = {}
+        for _, dropdown in pairs(previewFrame.content.optionalDropdowns) do
+            table.insert(optionalReagents, dropdown.selectedID)
+        end
+    end
+
+    
     local requestData = {
         recipeID = recipeID,
         professionID = previewFrame.professionID,
-        customer = GetUnitName("player", true)
+        customer = GetUnitName("player", true),
+        isInit = isInit,
+        optionalReagents = optionalReagents,
     }
-
+    
     print("SendRecipeUpdateRequest", false, true)
+    if optionalReagents then
+        print("numOptionals: " .. #optionalReagents)
+    end
     CraftSim.COMM:SendData(PREVIEW_REQUEST_RECIPE_UPDATE, requestData, "WHISPER", previewFrame.crafter)
+    CraftSim.CUSTOMER_SERVICE:StartLivePreviewUpdating()
 end
 
 function CraftSim.CUSTOMER_SERVICE.OnRecipeUpdateRequest(payload)
@@ -168,7 +189,7 @@ function CraftSim.CUSTOMER_SERVICE.OnRecipeUpdateRequest(payload)
 
     print("OnRecipeUpdateRequest")
 
-    local optimizedRecipe = CraftSim.CUSTOMER_SERVICE:OptimizeRecipe(recipeID)
+    local optimizedRecipe = CraftSim.CUSTOMER_SERVICE:OptimizeRecipe(recipeID, payload.optionalReagents)
 
     if not optimizedRecipe then
         return
@@ -182,7 +203,10 @@ function CraftSim.CUSTOMER_SERVICE.OnRecipeUpdateRequest(payload)
         recipeIcon = optimizedRecipe.recipeData.recipeIcon,
         inspirationPercent = inspPercent,
         reagents = optimizedRecipe.recipeData.reagents,
+        optionalReagents = optimizedRecipe.recipeData.possibleOptionalReagents,
+        finishingReagents = optimizedRecipe.recipeData.possibleFinishingReagents,
         outputInfo = optimizedRecipe.outputInfo,
+        isInit = payload.isInit,
     }
 
     CraftSim.COMM:SendData(PREVIEW_RECIPE_UPDATE_RESPONSE, responseData, "WHISPER", customer)
@@ -195,6 +219,7 @@ function CraftSim.CUSTOMER_SERVICE.OnRecipeUpdateResponse(payload)
     print(payload.outputInfo, true)
 
     CraftSim.CUSTOMER_SERVICE.FRAMES:UpdateRecipe(payload)
+    CraftSim.CUSTOMER_SERVICE:StopLivePreviewUpdating()
 end
 
 -- On the recipient side, decode the string and transform it into a clickable link
@@ -207,14 +232,58 @@ function CraftSim.CUSTOMER_SERVICE:TransformLink(event, message, sender, ...)
     end
 end
 
-function CraftSim.CUSTOMER_SERVICE:OptimizeRecipe(recipeID)
+local function getCraftReagentInfoTblEntryFromOptionalsByItemID(recipeData, itemID)
+    local optionalReagent = nil
+    local finishingReagent = nil
+
+    for _, slot in pairs(recipeData.possibleOptionalReagents) do
+        optionalReagent = CraftSim.UTIL:Find(slot, function(r) return r.itemID == itemID end)
+        if optionalReagent then
+            break
+        end
+    end
+    for _, slot in pairs(recipeData.possibleFinishingReagents) do
+        finishingReagent = CraftSim.UTIL:Find(slot, function(r) return r.itemID == itemID end)
+        if finishingReagent then
+            break
+        end
+    end
+
+    local reagent = optionalReagent or finishingReagent
+
+    if reagent then
+        reagent.quantity = 1
+        reagent.itemData = CraftSim.DATAEXPORT:GetItemFromCacheByItemID(itemID)
+    end
+
+    return reagent
+end
+
+function CraftSim.CUSTOMER_SERVICE:OptimizeRecipe(recipeID, optionalReagents)
     local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
     if not recipeInfo then
         print("Could not fetch recipeInfo for recipe: " .. tostring(recipeID))
         return
     end
 
-    local recipeData = CraftSim.DATAEXPORT:exportRecipeData(recipeInfo.recipeID, CraftSim.CONST.EXPORT_MODE.SCAN)
+    local recipeData = nil
+    local mappedOptionalReagents = nil
+    if optionalReagents and #optionalReagents > 0 then
+        -- build them to craftingreagentInfoTbl items
+        recipeData = CraftSim.DATAEXPORT:exportRecipeData(recipeInfo.recipeID, CraftSim.CONST.EXPORT_MODE.SCAN)
+
+        mappedOptionalReagents = CraftSim.UTIL:Map(optionalReagents, function(itemID) 
+            return getCraftReagentInfoTblEntryFromOptionalsByItemID(recipeData, itemID)
+        end)
+    end
+
+    print("mapped optionals:", false, true)
+    print(mappedOptionalReagents, true)
+
+    local initialOverride = (mappedOptionalReagents and {optionalReagents=mappedOptionalReagents}) or nil
+    print("initial override: ", false, true)
+    print(initialOverride, true)
+    recipeData = CraftSim.DATAEXPORT:exportRecipeData(recipeInfo.recipeID, CraftSim.CONST.EXPORT_MODE.SCAN, initialOverride)
     if not recipeData then
         print("Could not create recipeData for recipe optimization")
         return
@@ -226,10 +295,7 @@ function CraftSim.CUSTOMER_SERVICE:OptimizeRecipe(recipeID)
     end
     local optimizedReagents = CraftSim.REAGENT_OPTIMIZATION:OptimizeReagentsForScannedRecipeData(recipeData, priceData, true) 
 
-    --print("optimized reagents:")
-    --print(optimizedReagents, true)
-
-    recipeData = CraftSim.DATAEXPORT:exportRecipeData(recipeInfo.recipeID, CraftSim.CONST.EXPORT_MODE.SCAN, {scanReagents=optimizedReagents})
+    recipeData = CraftSim.DATAEXPORT:exportRecipeData(recipeInfo.recipeID, CraftSim.CONST.EXPORT_MODE.SCAN, {scanReagents=optimizedReagents, optionalReagents=mappedOptionalReagents})
     if not recipeData then
         print("2 Could not create recipeData for recipe optimization")
         return
@@ -432,5 +498,15 @@ function CraftSim.CUSTOMER_SERVICE:CHAT_MSG_WHISPER(text, playerName,
             end
         end
     end
+end
+
+function CraftSim.CUSTOMER_SERVICE:StartLivePreviewUpdating()
+    local previewFrame = CraftSim.FRAME:GetFrame(CraftSim.CONST.FRAMES.LIVE_PREVIEW)
+    previewFrame.content.StartUpdate()
+end
+
+function CraftSim.CUSTOMER_SERVICE:StopLivePreviewUpdating()
+    local previewFrame = CraftSim.FRAME:GetFrame(CraftSim.CONST.FRAMES.LIVE_PREVIEW)
+    previewFrame.content.StopUpdate()
 end
 

@@ -4,13 +4,7 @@ CraftSim.FRAME = {}
 
 CraftSim.FRAME.frames = {}
 
--- local function print(text, recursive, l) -- override
---     if CraftSim_DEBUG and CraftSim.FRAME.GetFrame and CraftSim.FRAME:GetFrame(CraftSim.CONST.FRAMES.DEBUG) then
---         CraftSim_DEBUG:print(text, CraftSim.CONST.DEBUG_IDS.FRAMES, recursive, l)
---     else
---         print(text)
---     end
--- end
+local print = CraftSim.UTIL:SetDebugPrint(CraftSim.CONST.DEBUG_IDS.FRAMES) 
 
 function CraftSim.FRAME:GetFrame(frameID)
     local frameName = CraftSim.FRAME.frames[frameID]
@@ -115,24 +109,88 @@ function CraftSim.FRAME:initDropdownMenu(frameName, parent, anchorFrame, label, 
     return dropDown
 end
 
-function CraftSim.FRAME:initializeDropdownByData(dropDown, list, defaultValue)
-	UIDropDownMenu_Initialize(dropDown, function(self) 
-		for k, v in pairs(list) do
-            local label = v.label
-            local value = v.value
-			local info = UIDropDownMenu_CreateInfo()
-            --print("init dropdown by data label: " .. tostring(label))
-            --print("init dropdown by data value: " .. tostring(value))
-			info.func = function(self, arg1, arg2, checked) 
-                UIDropDownMenu_SetText(dropDown, self.value) -- value should contain the selected text..
-                dropDown.clickCallback(dropDown, arg1)
-            end
-			info.text = label
-			info.arg1 = value
-			UIDropDownMenu_AddButton(info)
-		end
-	end)
+-- anchor: e.g. "ANCHOR_RIGHT"
+-- if itemLink is nil it removes the tooltip
+function CraftSim.FRAME:SetItemTooltip(frame, itemLink, owner, anchor)
+    local function onEnter()
+        local _, ItemLink = GameTooltip:GetItem()
+        GameTooltip:SetOwner(owner, anchor);
 
+        if ItemLink ~= itemLink then
+            -- to not set it again and hide the tooltip..
+            GameTooltip:SetHyperlink(itemLink)
+        end
+        GameTooltip:Show();
+    end
+    local function onLeave()
+        GameTooltip:Hide();
+    end
+    if itemLink then
+        frame:SetScript("OnEnter", onEnter)
+        frame:SetScript("OnLeave", onLeave)
+    else
+        frame:SetScript("OnEnter", nil)
+        frame:SetScript("OnLeave", nil)
+
+    end
+end
+
+--- @param showCount? boolean if enabled, item tooltips show how many the player possesses
+--- @param showItemTooltips? boolean requires the label to be an itemLink
+--- @param concatCallback? function takes one argument which is the itemlink and returns a string that is added to the items tooltip
+function CraftSim.FRAME:initializeDropdownByData(dropDown, list, defaultValue, showItemTooltips, showCount, concatCallback)
+    print("Init Dropdown By Data", false, true)
+    print("showItemTooltips: " .. tostring(showItemTooltips))
+    local function initMainMenu(self, level, menulist) 
+        local info = UIDropDownMenu_CreateInfo()
+        if level == 1 then
+            for _, v in pairs(list) do
+                local label = v.label
+                local value = v.value
+                local hasSublist = type(value) == 'table'
+                if not hasSublist then
+                    info.func = function(self, arg1, arg2, checked) 
+                        UIDropDownMenu_SetText(dropDown, self.value) -- value should contain the selected text..
+                        dropDown.clickCallback(dropDown, arg1)
+                    end
+                end
+                info.text = label
+                info.arg1 = value
+                info.hasArrow = hasSublist
+                info.menuList = hasSublist and label
+                if showItemTooltips then
+                    print("initializeDropdownByData: Set Item Tooltip: " .. tostring(label), false, true)
+                    info.tooltipText = CraftSim.UTIL:GetItemTooltipText(label, showCount)
+                    -- cut first line as it is the name of the item
+                    info.tooltipTitle, info.tooltipText = string.match(info.tooltipText, "^(.-)\n(.*)$")
+                    if concatCallback then
+                    info.tooltipTitle = info.tooltipTitle .. "\n" .. tostring(concatCallback(label))
+                    end
+                    info.tooltipOnButton = true
+                end
+                UIDropDownMenu_AddButton(info)
+            end
+        elseif menulist then
+            for _, currentMenulist in pairs(list) do
+                if currentMenulist.label == menulist then
+                    for _, v in pairs(currentMenulist.value) do
+                        local label = v.label
+                        local value = v.value
+                        info.func = function(self, arg1, arg2, checked) 
+                            UIDropDownMenu_SetText(dropDown, self.value) -- value should contain the selected text..
+                            dropDown.clickCallback(dropDown, arg1)
+                            CloseDropDownMenus()
+                        end
+                        info.text = label
+                        info.arg1 = value
+                        UIDropDownMenu_AddButton(info, level)
+                    end
+                end
+            end
+        end
+	end
+
+	UIDropDownMenu_Initialize(dropDown, initMainMenu, "DROPDOWN_MENU_LEVEL")
 	UIDropDownMenu_SetText(dropDown, defaultValue)
 end
 
@@ -596,10 +654,10 @@ function CraftSim.FRAME:InitDebugFrame()
     local controlPanel = CraftSim.FRAME:CreateCraftSimFrame("CraftSimDebugControlFrame", "Debug Control", 
     frame, 
     frame, 
-    "TOPRIGHT", "TOPLEFT", 10, 0, 300, 400, CraftSim.CONST.FRAMES.DEBUG_CONTROL, true)
+    "TOPRIGHT", "TOPLEFT", 10, 0, 300, 400, CraftSim.CONST.FRAMES.DEBUG_CONTROL)
 
     controlPanel.content.autoScrollCB = CraftSim.FRAME:CreateCheckbox("Autoscroll", "Toggle Log Autoscrolling", "debugAutoScroll", controlPanel.content,
-    controlPanel.content, "TOP", "TOP", -100, -10)
+    controlPanel.content, "TOP", "TOP", -120, -30)
 
     controlPanel.content.clearButton = CreateFrame("Button", nil, controlPanel.content, "UIPanelButtonTemplate")
 	controlPanel.content.clearButton:SetPoint("TOP", controlPanel.content.autoScrollCB, "BOTTOM", 100, 0)	
@@ -643,16 +701,17 @@ function CraftSim.FRAME:InitDebugFrame()
         CraftSim.CACHE:ClearAll()
     end)
 
+    controlPanel.content.debugIDScrollFrame, controlPanel.content.debugIDSFrame = CraftSim.FRAME:CreateScrollFrame(controlPanel.content, -130, 10, -40, 20)
     local checkBoxOffsetY = 0
-    controlPanel.content.checkBoxID_MAIN = CraftSim.FRAME:CreateCheckbox(
-        " MAIN", "Enable MAIN Output", "enableDebugID_MAIN", controlPanel.content, controlPanel.content.nodeDebugInput, "TOPLEFT", "TOPLEFT", -5, checkBoxOffsetY - 55)
+    controlPanel.content.debugIDSFrame.checkBoxID_MAIN = CraftSim.FRAME:CreateCheckbox(
+        " MAIN", "Enable MAIN Output", "enableDebugID_MAIN", controlPanel.content.debugIDSFrame, controlPanel.content.debugIDSFrame, "TOPLEFT", "TOPLEFT", 5, 0)
     
-    local lastHook = controlPanel.content.checkBoxID_MAIN
+    local lastHook = controlPanel.content.debugIDSFrame.checkBoxID_MAIN
     for _, debugID in pairs(CraftSim.CONST.DEBUG_IDS) do
         if debugID ~= CraftSim.CONST.DEBUG_IDS.MAIN then
-            controlPanel.content["checkboxID_" .. debugID] = CraftSim.FRAME:CreateCheckbox(
-        " " .. debugID, "Enable "..debugID.." Output", "enableDebugID_" .. debugID, controlPanel.content, lastHook, "TOPLEFT", "BOTTOMLEFT", 0, checkBoxOffsetY)
-        lastHook = controlPanel.content["checkboxID_" .. debugID]
+            controlPanel.content.debugIDSFrame["checkboxID_" .. debugID] = CraftSim.FRAME:CreateCheckbox(
+        " " .. debugID, "Enable "..debugID.." Output", "enableDebugID_" .. debugID, controlPanel.content.debugIDSFrame, lastHook, "TOPLEFT", "BOTTOMLEFT", 0, checkBoxOffsetY)
+        lastHook = controlPanel.content.debugIDSFrame["checkboxID_" .. debugID]
         end
     end
 
@@ -741,7 +800,7 @@ function CraftSim.FRAME:InitOneTimeNoteFrame()
     "CENTER", "CENTER", 0, 0, 500, 300, CraftSim.CONST.FRAMES.INFO, true, true)
 
     frame.content.discordBox = CraftSim.FRAME:CreateInput(
-        nil, frame.content, frame.content, "TOP", "TOP", 30, -20, 200, 30, CraftSim.CONST.DISCORD_INVITE_URL, function() 
+        nil, frame.content, frame.content, "TOP", "TOP", 0, -20, 200, 30, CraftSim.CONST.DISCORD_INVITE_URL, function() 
             -- do not let the player remove the discord link.. lol
             frame.content.discordBox:SetText(CraftSim.CONST.DISCORD_INVITE_URL)
         end)

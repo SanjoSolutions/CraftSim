@@ -36,6 +36,9 @@ function CraftSim.DATAEXPORT:GetDifferentQualityIDsByCraftingReagentTbl(recipeID
 end
 
 function CraftSim.DATAEXPORT:AddSupportedRecipeStats(recipeData, operationInfo)
+	if not operationInfo then
+		return
+	end
 	local bonusStats = operationInfo.bonusStats
 	recipeData.stats = {}
 	for _, statInfo in pairs(bonusStats) do
@@ -319,7 +322,7 @@ function CraftSim.DATAEXPORT:handlePlayerProfessionStatsV2(recipeData, exportMod
 
 		recipeData.stats.resourcefulness.value = buffStats.resourcefulness + itemBonus + specNodeBonus
 		recipeData.stats.resourcefulness.percent = CraftSim.UTIL:GetResourcefulnessPercentByStat(recipeData.stats.resourcefulness.value) * 100
-		recipeData.stats.resourcefulness.bonusItemsFactor = specNodeBonusItemsFactor * finishingReagentsBonusItemsFactor
+		recipeData.stats.resourcefulness.bonusItemsFactor = specNodeBonusItemsFactor + finishingReagentsBonusItemsFactor
 		recipeData.stats.resourcefulness.bonusItemsFactorNoSpecs = 0
 	end
 
@@ -373,13 +376,13 @@ function CraftSim.DATAEXPORT:GetQualityIDFromOptionalReagentItemID(itemID)
 	if optionalReagentEntry then
 		return optionalReagentEntry.qualityID
 	else
-		error("Optional Reagent not found in Data: " .. tostring(itemID))
+		print("Optional Reagent not found in Data: " .. tostring(itemID) .. "possibly old world recipe")
 		return nil
 	end
 
 end
 
-function CraftSim.DATAEXPORT:exportAvailableSlotReagentsFromReagentSlotsV2(schematicSlots, reagentType)
+function CraftSim.DATAEXPORT:exportAvailableSlotReagentsFromReagentSlotsV2(schematicSlots, reagentType, recipeID, skillLineID)
 	if not schematicSlots then
 		return {}
 	end
@@ -391,6 +394,22 @@ function CraftSim.DATAEXPORT:exportAvailableSlotReagentsFromReagentSlotsV2(schem
 		local button = slotData
 		local reagents = slotData.reagents
 		local dataSlotIndex = slotData.dataSlotIndex
+
+		print(CraftSim.UTIL:ColorizeText("schematicSlot", CraftSim.CONST.COLORS.LEGENDARY), false, true)
+		print(slotData, true)
+
+		local locked = false
+		local lockedReason = ""
+		if slotData.slotInfo and slotData.slotInfo.mcrSlotID then
+			locked, lockedReason = C_TradeSkillUI.GetReagentSlotStatus(slotData.slotInfo.mcrSlotID, recipeID, skillLineID)
+	
+			if locked then
+				print(CraftSim.UTIL:ColorizeText("locked", CraftSim.CONST.COLORS.RED))
+				print("reason: " .. tostring(lockedReason))
+			else
+				print(CraftSim.UTIL:ColorizeText("not locked", CraftSim.CONST.COLORS.GREEN))
+			end
+		end
 
 		if reagentType == slotData.reagentType then
 			-- count up for the different data slot indices
@@ -405,47 +424,15 @@ function CraftSim.DATAEXPORT:exportAvailableSlotReagentsFromReagentSlotsV2(schem
 				table.insert(slotsToItemIDs[currentRelevantSlot], {
 					itemID = slotReagentData.itemID,
 					qualityID = CraftSim.DATAEXPORT:GetQualityIDFromOptionalReagentItemID(slotReagentData.itemID),
-					dataSlotIndex = dataSlotIndex
+					dataSlotIndex = dataSlotIndex,
+					locked = locked,
+					lockedReason = lockedReason,
 				})
 			end
 		end
 	end
 
 	return slotsToItemIDs
-end
-
--- DEPRICATED
--- function CraftSim.DATAEXPORT:exportAvailableSlotReagentsFromReagentSlots(reagentSlots)
--- 	if not reagentSlots then
--- 		return {}
--- 	end
--- 	-- could be more than 1 slot for optional and finishing, but is one slot strictly for salvaging
--- 	local slotsToItemIDs = {}
--- 	for slotIndex, slotData in pairs(reagentSlots) do
--- 		local button = slotData
--- 		local reagents = slotData.reagentSlotSchematic.reagents
--- 		local dataSlotIndex = slotData.reagentSlotSchematic.dataSlotIndex
-
--- 		for _, slotReagentData in pairs(reagents) do
--- 			if slotsToItemIDs[slotIndex] == nil then
--- 				slotsToItemIDs[slotIndex] = {}
--- 			end
--- 			table.insert(slotsToItemIDs[slotIndex], {
--- 				itemID = slotReagentData.itemID,
--- 				qualityID = CraftSim.DATAEXPORT:GetQualityIDFromOptionalReagentItemID(slotReagentData.itemID),
--- 				dataSlotIndex = dataSlotIndex
--- 			})
--- 		end
--- 	end
-
--- 	return slotsToItemIDs
--- end
-
--- UNUSED YET UNTIL NEEDED
-function CraftSim.DATAEXPORT:HandleQualityItemIDsOrderException(recipeData)
-	local exceptionOrder = CraftSim.CONST.EXCEPTION_ORDER_ITEM_IDS[recipeData.recipeID]
-	recipeData.result.itemIDs = exceptionOrder
-	return exceptionOrder
 end
 
 function CraftSim.DATAEXPORT:GetCurrentRecipeOperationInfoByExportMode(exportMode, recipeID, overrideData)
@@ -456,14 +443,17 @@ function CraftSim.DATAEXPORT:GetCurrentRecipeOperationInfoByExportMode(exportMod
 	elseif exportMode == CraftSim.CONST.EXPORT_MODE.SCAN then
 		if overrideData then
 			local craftingReagentInfoTbl = CraftSim.DATAEXPORT:ConvertRecipeDataRequiredReagentsToCraftingReagentInfoTbl(overrideData.scanReagents or {})
-
+			print("whatsmyoverridedata? ")
+			print(overrideData, true)
 			for _, reagent in pairs(overrideData.optionalReagents or {}) do
+				print("inserting optional from override: " .. tostring(reagent))
 				table.insert(craftingReagentInfoTbl, reagent)
 			end
 			for _, reagent in pairs(overrideData.finishingReagents or {}) do
 				table.insert(craftingReagentInfoTbl, reagent)
 			end
-
+			print("craftingreagentinfotableByOverride: ")
+			print(craftingReagentInfoTbl, true)
 			return C_TradeSkillUI.GetCraftingOperationInfo(recipeID, craftingReagentInfoTbl) 
 		else
 			return C_TradeSkillUI.GetCraftingOperationInfo(recipeID, {})
@@ -635,6 +625,9 @@ function CraftSim.DATAEXPORT:exportRecipeData(recipeID, exportMode, overrideData
 	recipeData.professionInfo = professionInfo
 	local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
 
+	print("recipeInfo:")
+	print(recipeInfo, true)
+
 	-- Can happen when manually called without recipe open
 	if not recipeInfo then
 		print("RecipeInfo nil")
@@ -650,11 +643,12 @@ function CraftSim.DATAEXPORT:exportRecipeData(recipeID, exportMode, overrideData
 	recipeData.recipeID = recipeInfo.recipeID
 	print("recipeID: " .. tostring(recipeData.recipeID))
 	recipeData.recipeType = recipeType
+	recipeData.supportsCraftingStats = recipeInfo.supportsCraftingStats
 	
 	
 	local operationInfo = CraftSim.DATAEXPORT:GetCurrentRecipeOperationInfoByExportMode(exportMode, recipeData.recipeID, overrideData)
 	
-    if operationInfo == nil or recipeType == CraftSim.CONST.RECIPE_TYPES.GATHERING then
+    if recipeInfo.supportsCraftingStats and (operationInfo == nil or recipeType == CraftSim.CONST.RECIPE_TYPES.GATHERING) then
 		print("OperationInfo nil")
         return nil
     end
@@ -670,7 +664,7 @@ function CraftSim.DATAEXPORT:exportRecipeData(recipeID, exportMode, overrideData
 
 	print("recipeType: " .. tostring(recipeData.recipeType))
 
-	recipeData.expectedQuality = operationInfo.craftingQuality
+	recipeData.expectedQuality = operationInfo and operationInfo.craftingQuality
 	recipeData.operationInfo = operationInfo
 	print("expectedQuality: " .. tostring(recipeData.expectedQuality))
 	print("expectedQuality: " .. tostring(recipeData.expectedQuality))
@@ -713,8 +707,8 @@ function CraftSim.DATAEXPORT:exportRecipeData(recipeID, exportMode, overrideData
 	end
 
 	-- extract possible optional and finishing and salvage reagents per slot
-	recipeData.possibleOptionalReagents = CraftSim.DATAEXPORT:exportAvailableSlotReagentsFromReagentSlotsV2(schematicInfo.reagentSlotSchematics, CraftSim.CONST.REAGENT_TYPE.OPTIONAL)
-	recipeData.possibleFinishingReagents = CraftSim.DATAEXPORT:exportAvailableSlotReagentsFromReagentSlotsV2(schematicInfo.reagentSlotSchematics, CraftSim.CONST.REAGENT_TYPE.FINISHING_REAGENT)
+	recipeData.possibleOptionalReagents = CraftSim.DATAEXPORT:exportAvailableSlotReagentsFromReagentSlotsV2(schematicInfo.reagentSlotSchematics, CraftSim.CONST.REAGENT_TYPE.OPTIONAL, recipeData.recipeID, recipeData.professionInfo.skillLineID)
+	recipeData.possibleFinishingReagents = CraftSim.DATAEXPORT:exportAvailableSlotReagentsFromReagentSlotsV2(schematicInfo.reagentSlotSchematics, CraftSim.CONST.REAGENT_TYPE.FINISHING_REAGENT, recipeData.recipeID, recipeData.professionInfo.skillLineID)
 	recipeData.possibleSalvageReagents = C_TradeSkillUI.GetSalvagableItemIDs(recipeData.recipeID) -- thx blizz tbh
 
 	print("possible optional reagents:")
@@ -771,16 +765,15 @@ function CraftSim.DATAEXPORT:exportRecipeData(recipeID, exportMode, overrideData
 			end
 		end
 	elseif not recipeData.isSalvageRecipe then
-		recipeData.reagents = overrideData.scanReagents
-		-- optionals and such?
+		recipeData.reagents = CopyTable(overrideData.scanReagents)
 	end
 
 	if overrideData.optionalReagents then
-		recipeData.optionalReagents = overrideData.optionalReagents
+		recipeData.optionalReagents = CopyTable(overrideData.optionalReagents)
 	end
 
 	if overrideData.finishingReagents then
-		recipeData.finishingReagents = overrideData.finishingReagents
+		recipeData.finishingReagents = CopyTable(overrideData.finishingReagents)
 	end
 
 	recipeData.hasReagentsWithQuality = hasReagentsWithQuality
@@ -793,9 +786,9 @@ function CraftSim.DATAEXPORT:exportRecipeData(recipeID, exportMode, overrideData
 	print("baseItemAmount: " .. tostring(recipeData.baseItemAmount) .. "(" .. tostring(schematicInfo.quantityMin) .. "-" .. tostring(schematicInfo.quantityMax) .. ")")
 	
 	
-	recipeData.recipeDifficulty = operationInfo.baseDifficulty + operationInfo.bonusDifficulty
-	recipeData.baseDifficulty = operationInfo.baseDifficulty
-	recipeData.bonusDifficulty = operationInfo.bonusDifficulty
+	recipeData.recipeDifficulty = operationInfo and (operationInfo.baseDifficulty + operationInfo.bonusDifficulty)
+	recipeData.baseDifficulty = operationInfo and operationInfo.baseDifficulty
+	recipeData.bonusDifficulty = operationInfo and operationInfo.bonusDifficulty
 	print("recipeDifficulty: " .. tostring(recipeData.recipeDifficulty))
 	print("baseDifficulty: " .. tostring(recipeData.baseDifficulty))
 	print("bonusDifficulty: " .. tostring(recipeData.bonusDifficulty))
@@ -846,12 +839,8 @@ function CraftSim.DATAEXPORT:exportRecipeData(recipeID, exportMode, overrideData
 		for _, itemLink in pairs(recipeData.result.itemQualityLinks) do
 			table.insert(recipeData.result.resultItems, Item:CreateFromItemLink(itemLink))
 		end
-	elseif recipeType == CraftSim.CONST.RECIPE_TYPES.NO_QUALITY_MULTIPLE then
+	elseif recipeType == CraftSim.CONST.RECIPE_TYPES.NO_QUALITY_MULTIPLE or recipeType == CraftSim.CONST.RECIPE_TYPES.NO_QUALITY_SINGLE or recipeType == CraftSim.CONST.RECIPE_TYPES.NO_CRAFT_OPERATION then
 		-- Probably something like transmuting air reagent that creates non equip stuff without qualities
-		recipeData.result.itemID = CraftSim.UTIL:GetItemIDByLink(recipeInfo.hyperlink)
-		recipeData.result.isNoQuality = true	
-		table.insert(recipeData.result.resultItems, Item:CreateFromItemID(recipeData.result.itemID))
-	elseif recipeType == CraftSim.CONST.RECIPE_TYPES.NO_QUALITY_SINGLE then
 		recipeData.result.itemID = CraftSim.UTIL:GetItemIDByLink(recipeInfo.hyperlink)
 		recipeData.result.isNoQuality = true	
 		table.insert(recipeData.result.resultItems, Item:CreateFromItemID(recipeData.result.itemID))
@@ -869,22 +858,25 @@ function CraftSim.DATAEXPORT:exportRecipeData(recipeID, exportMode, overrideData
 
 	CraftSim.DATAEXPORT:AddSupportedRecipeStats(recipeData, operationInfo)
 
-	if not CraftSim.UTIL:IsSpecImplemented(recipeData.professionID) then
-		recipeData.extraItemFactors = CraftSim.SPEC_DATA:GetSpecExtraItemFactorsByRecipeData(recipeData)
-		print("NoSpec ExtraItemFactors:")
-		print(recipeData.extraItemFactors, true)
-	else
-		print(CraftSim.UTIL:ColorizeText("Recipe is using SpecData", CraftSim.CONST.COLORS.GREEN))
-		recipeData.buffData = CraftSim.DATAEXPORT:exportBuffData()
-		print("BuffData:")
-		print(recipeData.buffData, true)
-		recipeData.specNodeData = CraftSim.DATAEXPORT:exportSpecNodeData(recipeData)
+	if operationInfo then
+		if not CraftSim.UTIL:IsSpecImplemented(recipeData.professionID) then
+			recipeData.extraItemFactors = CraftSim.SPEC_DATA:GetSpecExtraItemFactorsByRecipeData(recipeData)
+			print("NoSpec ExtraItemFactors:")
+			print(recipeData.extraItemFactors, true)
+		else
+			print(CraftSim.UTIL:ColorizeText("Recipe is using SpecData", CraftSim.CONST.COLORS.GREEN))
+			recipeData.buffData = CraftSim.DATAEXPORT:exportBuffData()
+			print("BuffData:")
+			print(recipeData.buffData, true)
+			recipeData.specNodeData = CraftSim.DATAEXPORT:exportSpecNodeData(recipeData)
+		end
+
+		CraftSim.DATAEXPORT:handlePlayerProfessionStats(recipeData, operationInfo, exportMode)
+		recipeData.maxReagentSkillIncreaseFactor = CraftSim.REAGENT_OPTIMIZATION:GetMaxReagentIncreaseFactor(recipeData, exportMode)
+		print("maxReagentSkillIncreaseFactor: " .. tostring(recipeData.maxReagentSkillIncreaseFactor))
 	end
 
 
-	CraftSim.DATAEXPORT:handlePlayerProfessionStats(recipeData, operationInfo, exportMode)
-	recipeData.maxReagentSkillIncreaseFactor = CraftSim.REAGENT_OPTIMIZATION:GetMaxReagentIncreaseFactor(recipeData, exportMode)
-	print("maxReagentSkillIncreaseFactor: " .. tostring(recipeData.maxReagentSkillIncreaseFactor))
 
 	CraftSim.MAIN.currentRecipeData = recipeData
 

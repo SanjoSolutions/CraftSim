@@ -112,7 +112,7 @@ function CraftSim.REAGENT_OPTIMIZATION:OptimizeReagentAllocation(recipeData, rec
     -- should be 0 for scan
     local reagentSkillContribution = CraftSim.REAGENT_OPTIMIZATION:GetCurrentReagentAllocationSkillIncrease(recipeData, exportMode) or 0
     local skillWithoutReagentIncrease = recipeData.stats.skillNoReagents
-    
+    print("in Simulation Mode: " .. tostring(recipeData.isSimModeData ~= nil))
     print("skill total: " .. tostring(recipeData.stats.skill))
     print("skill without reagents: " .. tostring(skillWithoutReagentIncrease))
     print("reagentSkillContribution: " .. tostring(reagentSkillContribution))
@@ -652,7 +652,7 @@ function CraftSim.REAGENT_OPTIMIZATION:IsCurrentAllocation(recipeData, bestAlloc
     return true
 end
 
-function CraftSim.REAGENT_OPTIMIZATION:OptimizeReagentsForScannedRecipeData(recipeData, priceData, UseInspiration) 
+function CraftSim.REAGENT_OPTIMIZATION:OptimizeReagentsForScannedRecipeData(recipeData, priceData, UseInspiration, overrideData) 
     if not recipeData.hasReagentsWithQuality then
         return recipeData.reagents -- e.g: Primal Convergence
     end

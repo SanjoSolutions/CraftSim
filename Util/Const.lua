@@ -3,7 +3,7 @@ _, CraftSim = ...
 CraftSim.CONST = {}
 
 -- One Time Info ------------
-CraftSim.CONST.currentInfoVersionID = 36 -- last patch increase: 6.1 - 36
+CraftSim.CONST.currentInfoVersionID = 39 -- last patch increase: 6.2.1 - 39
 CraftSim.CONST.debugInfoText = false
 CraftSim.CONST.infoBoxSizeX = 500
 CraftSim.CONST.infoBoxSizeY = 400
@@ -80,6 +80,8 @@ CraftSim.CONST.DEBUG_IDS = {
     STATISTICS = "STATISTICS",
     CUSTOMER_SERVICE = "CUSTOMER_SERVICE",
     COMM = "COMM",
+    UTIL = "UTIL",
+    COST_OVERVIEW = "COST_OVERVIEW",
 }
 
 CraftSim.CONST.ERROR = {
@@ -150,7 +152,7 @@ CraftSim.CONST.RECIPE_TYPES = {
     NO_QUALITY_SINGLE = 3, -- like repair hammer
     MULTIPLE = 4, -- like potions..
     SINGLE = 5, -- like omnium draconis
-    NO_CRAFT_OPERATION = 6, -- like reclaim from alchemy
+    NO_CRAFT_OPERATION = 6, -- like reclaim from alchemy or old world stuff
     GATHERING = 7,
     NO_ITEM = 8, -- like phial experimentation
     ENCHANT = 9,

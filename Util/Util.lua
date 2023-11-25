@@ -1,4 +1,4 @@
-AddonName, CraftSim = ...
+CraftSimAddonName, CraftSim = ...
 
 CraftSim.UTIL = {}
 
@@ -8,15 +8,19 @@ local resourcefulnessFactor = 0.00111
 local craftingspeedFactor = 0.002
 
 function CraftSim.UTIL:SetDebugPrint(debugID)
-    local function print(text, recursive, l) -- override
-        if CraftSim_DEBUG and CraftSim.FRAME.GetFrame and CraftSim.FRAME:GetFrame(CraftSim.CONST.FRAMES.DEBUG) then
-            CraftSim_DEBUG:print(text, debugID, recursive, l)
+    local function print(text, recursive, l, level)
+        if CraftSim_DEBUG and CraftSim.GGUI.GetFrame and CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.DEBUG) then
+            CraftSim_DEBUG:print(text, debugID, recursive, l, level)
         else
             print(text)
         end
     end
 
     return print
+end
+
+function CraftSim.UTIL:SystemPrint(text)
+    print(text)
 end
 
 local print = CraftSim.UTIL:SetDebugPrint(CraftSim.CONST.DEBUG_IDS.UTIL) 
@@ -65,53 +69,8 @@ function CraftSim.UTIL:GetResourcefulnessPercentByStat(stat)
     return stat * resourcefulnessFactor
 end
 
-function CraftSim.UTIL:round(number, decimals)
-    return (("%%.%df"):format(decimals)):format(number)
-end
-
-function CraftSim.UTIL:GetItemIDByLink(hyperlink)
-    local _, _, foundID = string.find(hyperlink, "item:(%d+)")
-    return tonumber(foundID)
-end
-
-function CraftSim.UTIL:ContinueOnAllItemsLoaded(itemList, callback) 
-		local itemsToLoad = #itemList
-        if itemsToLoad == 0 then
-            callback()
-        end
-		local itemLoaded = function ()
-			itemsToLoad = itemsToLoad - 1
-			CraftSim_DEBUG:print("util: loaded items left: " .. itemsToLoad, CraftSim.CONST.DEBUG_IDS.MAIN)
-	
-			if itemsToLoad <= 0 then
-				CraftSim_DEBUG:print("util: all items loaded, call callback", CraftSim.CONST.DEBUG_IDS.MAIN)
-				callback()
-			end
-		end
-
-		if itemsToLoad >= 1 then
-			for _, itemToLoad in pairs(itemList) do
-				itemToLoad:ContinueOnItemLoad(itemLoaded)
-			end
-		end
-end
-
-function CraftSim.UTIL:EquipItemByLink(link)
-	for bag=BANK_CONTAINER, NUM_BAG_SLOTS+NUM_BANKBAGSLOTS do
-		for slot=1,C_Container.GetContainerNumSlots(bag) do
-			local item = C_Container.GetContainerItemLink(bag, slot)
-			if item and item == link then
-				if CursorHasItem() or CursorHasMoney() or CursorHasSpell() then ClearCursor() end
-				C_Container.PickupContainerItem(bag, slot)
-				AutoEquipCursorItem()
-				return true
-			end
-		end
-	end
-end
-
 function CraftSim.UTIL:IsMyVersionHigher(versionB)
-    local versionA = GetAddOnMetadata(AddonName, "Version") or ""
+    local versionA = GetAddOnMetadata(CraftSimAddonName, "Version") or ""
     local subVersionsA = strsplittable(".", versionA)
     local subVersionsB = strsplittable(".", versionB)
 
@@ -235,102 +194,47 @@ function CraftSim.UTIL:KethoEditBox_Show(text)
     
     if text then
         KethoEditBoxEditBox:SetText(text)
+        KethoEditBoxEditBox:HighlightText(0, KethoEditBoxEditBox:GetNumLetters())
     end
     KethoEditBox:Show()
 end
 
-function CraftSim.UTIL:isItemSoulbound(itemID)
-    local _, _, _, _, _, _, _, _, _, _, _, _, _, bindType = GetItemInfo(itemID) 
-    return bindType == CraftSim.CONST.BINDTYPES.SOULBOUND
-end
-
-function CraftSim.UTIL:GetQualityIconAsText(qualityID, sizeX, sizeY, offsetX, offsetY)
-    return CreateAtlasMarkup("Professions-Icon-Quality-Tier" .. qualityID, sizeX, sizeY, offsetX, offsetY)
-end
-
-function CraftSim.UTIL:GetRecipeType(recipeInfo) -- the raw info
-    local schematicInfo = C_TradeSkillUI.GetRecipeSchematic(recipeInfo.recipeID, false)
-    if not recipeInfo.supportsCraftingStats then
-        return CraftSim.CONST.RECIPE_TYPES.NO_CRAFT_OPERATION
-    elseif recipeInfo.isEnchantingRecipe then
-        return CraftSim.CONST.RECIPE_TYPES.ENCHANT
-    elseif schematicInfo.hasGatheringOperationInfo then
-        return CraftSim.CONST.RECIPE_TYPES.GATHERING
-    elseif recipeInfo.hasSingleItemOutput and recipeInfo.qualityIlvlBonuses ~= nil then -- its gear
-        local itemID = schematicInfo.outputItemID
-		if CraftSim.UTIL:isItemSoulbound(itemID) then
-            return CraftSim.CONST.RECIPE_TYPES.SOULBOUND_GEAR
-        else
-            return CraftSim.CONST.RECIPE_TYPES.GEAR
-        end
-	elseif recipeInfo.supportsQualities then
-        if not recipeInfo.qualityItemIDs and not recipeInfo.qualityIlvlBonuses then
-            return CraftSim.CONST.RECIPE_TYPES.NO_ITEM
-        elseif schematicInfo.quantityMin > 1 or schematicInfo.quantityMax > 1 then
-            return CraftSim.CONST.RECIPE_TYPES.MULTIPLE
-        elseif schematicInfo.quantityMin == 1 and schematicInfo.quantityMax == 1 then
-            return CraftSim.CONST.RECIPE_TYPES.SINGLE
-        end
-    elseif not recipeInfo.supportsQualities then
-        if schematicInfo.quantityMin > 1 or schematicInfo.quantityMax > 1 then
-            return CraftSim.CONST.RECIPE_TYPES.NO_QUALITY_MULTIPLE
-        elseif schematicInfo.quantityMin == 1 and schematicInfo.quantityMax == 1 then
-            return CraftSim.CONST.RECIPE_TYPES.NO_QUALITY_SINGLE
-        end
-    end
-end
-
-
-
 -- for debug purposes
-function CraftSim.UTIL:PrintTable(t, debugID, recursive)
+function CraftSim.UTIL:PrintTable(t, debugID, recursive, level)
+    level = level or 0
+    local levelString = ""
+    for i = 1, level, 1 do
+        levelString = levelString .. "-"
+    end
+
+    if t.Debug then
+        for _, line in pairs(t:Debug()) do
+            CraftSim_DEBUG:print(levelString .. tostring(line), debugID, false)
+        end
+        return
+    end
+
     for k, v in pairs(t) do
-        if not recursive or type(v) ~= "table" then
-            CraftSim_DEBUG:print(tostring(k) .. ": " .. tostring(v), debugID, false)
+        if type(v) == 'function' then
+            CraftSim_DEBUG:print(levelString .. tostring(k) .. ": function", debugID, false)
+        elseif not recursive or type(v) ~= "table" then
+            CraftSim_DEBUG:print(levelString .. tostring(k) .. ": " .. tostring(v), debugID, false)
         elseif type(v) == "table" then
-            CraftSim_DEBUG:print(tostring(k) .. ": ", debugID, false)
-            CraftSim.UTIL:PrintTable(v, debugID, recursive)
+            CraftSim_DEBUG:print(levelString .. tostring(k) .. ": ", debugID, false)
+            CraftSim.UTIL:PrintTable(v, debugID, recursive, level + 1)
         end
 
     end
 end
 
-function CraftSim.UTIL:Count(t, func)
-    local count = 0
-    for _, v in pairs(t) do
-        if func(v) then
-            count = count + 1
-        end
-    end
+function CraftSim.UTIL:RemoveLevelSpecBonusIDStringFromItemString(itemString)
+    local linkLevel, specializationID = string.match(itemString, "item:%d*:%d*:%d*:%d*:%d*:%d*:%d*:%d*:(%d+):(%d+)")
+    local bonusIDString = linkLevel .. ":" .. specializationID
 
-    return count
+    return string.gsub(itemString, bonusIDString, "")
 end
 
-function CraftSim.UTIL:Sort(t, compFunc)
-    local sorted = {}
-    for _, item in pairs(t) do
-        if sorted[1] == nil then
-            table.insert(sorted, item)
-        else
-            local sortedCopy = CopyTable(sorted)
-            local inserted = false
-            for sortedIndex, sortedItem in pairs(sortedCopy) do
-                if compFunc(item, sortedItem) then
-                    table.insert(sorted, sortedIndex, item)
-                    inserted = true
-                    break
-                end
-            end
-
-            if not inserted then
-                table.insert(sorted, item)
-            end
-        end
-    end
-
-    return sorted
-end
-
+--> built into GGUI
 function CraftSim.UTIL:ValidateNumberInput(inputBox, allowNegative)
     local inputNumber = inputBox:GetNumber()
     local inputText = inputBox:GetText()
@@ -376,14 +280,6 @@ function CraftSim.UTIL:WrapText(text, width)
 end
 
 function CraftSim.UTIL:IsSpecImplemented(professionID)
-
-    if professionID == Enum.Profession.Blacksmithing and not CraftSimOptions.blacksmithingEnabled or
-       professionID == Enum.Profession.Jewelcrafting and not CraftSimOptions.jewelcraftingEnabled or
-       professionID == Enum.Profession.Leatherworking and not CraftSimOptions.leatherworkingEnabled or
-       professionID == Enum.Profession.Alchemy and not CraftSimOptions.alchemyEnabled then
-        return false
-    end
-
     return tContains(CraftSim.CONST.IMPLEMENTED_SKILL_BUILD_UP(), professionID)
 end
 
@@ -391,186 +287,21 @@ function CraftSim.UTIL:GetExportModeByVisibility()
     return (ProfessionsFrame.OrdersPage.OrderView.OrderDetails:IsVisible() and CraftSim.CONST.EXPORT_MODE.WORK_ORDER) or CraftSim.CONST.EXPORT_MODE.NON_WORK_ORDER
 end
 
-function CraftSim.UTIL:FormatMoney(copperValue, useColor, percentRelativeTo)
-    local absValue = abs(copperValue)
-    local minusText = ""
-    local color = CraftSim.CONST.COLORS.GREEN
-    local percentageText = ""
-
-    if percentRelativeTo then
-        local oneP = percentRelativeTo / 100
-        local percent = CraftSim.UTIL:round(copperValue / oneP, 0)
-
-        if oneP == 0 then
-            percent = 0
-        end
-
-        percentageText = " (" .. percent .. "%)"
-    end
-
-    if copperValue < 0 then
-        minusText = "-"
-        color = CraftSim.CONST.COLORS.RED
-    end
-
-    if useColor then
-        return CraftSim.UTIL:ColorizeText(minusText .. GetCoinTextureString(absValue, 10) .. percentageText, color)
-    else
-        return minusText .. GetCoinTextureString(absValue, 10) .. percentageText
-    end
-end
-
-function CraftSim.UTIL:CollectGarbageAtThreshold(kbThreshold)
-    local kbUsed = collectgarbage("count")
-    print("kbUsed" .. tostring(kbUsed))
-    if kbUsed >= kbThreshold then
-        collectgarbage("collect")
-    end
-end
-
-function CraftSim.UTIL:CreateRegistreeForEvents(events)
-    local registree = CreateFrame("Frame", nil)
-    registree:SetScript("OnEvent", function(self, event, ...) self[event](self, ...) end)
-    for _, event in pairs(events) do
-        registree:RegisterEvent(event)
-    end
-    return registree
-end
-
-function CraftSim.UTIL:FilterTable(t, filterFunc)
-    local filtered = {}
-    for k, v in pairs(t) do
-        if filterFunc(v) then
-            table.insert(filtered, v)
-        end
-    end
-    return filtered
-end
-
--- options: subTable, isTableList
--- subTable: a subproperty that is a table that is to be mapped instead of the table itself
--- isTableList: if the table only consists of other tables, map each subTable instead
-function CraftSim.UTIL:Map(t, mapFunc, options)
-    options = options or {}
-    local mapped = {}
-    if not options.subTable then
-        for k, v in pairs(t) do
-            if options.isTableList then
-                if type(v) ~= "table" then
-                    error("UTIL.Map: t contains a nontable element")
-                end
-                for subK, subV in pairs(v) do
-                    local mappedValue = mapFunc(subV, subK)
-                    if not mappedValue then
-                        error("UTIL.Map: Did you forget to return in mapFunc?")
-                    end
-                    table.insert(mapped, mappedValue)
-                end
-            else
-                local mappedValue = mapFunc(v, k)
-                if not mappedValue then
-                    error("UTIL.Map: Did you forget to return in mapFunc?")
-                end
-                table.insert(mapped, mappedValue)
-            end
-        end
-        return mapped
-    else
-        for k, v in pairs(t) do
-            if not v[options.subTable] or type(v[options.subTable]) ~= "table" then
-                print("Mapping Error: given options.subTable is not existing or no table: " .. tostring(v[options.subTable]))
-            else
-                for subK, subV in pairs(v[options.subTable]) do
-                    local mappedValue = mapFunc(subV, subK)
-                    if not mappedValue then
-                        error("UTIL.Map: Did you forget to return in mapFunc?")
-                    end
-                    table.insert(mapped, mappedValue)
-                end
-            end
-        end
-        return mapped
-    end
-end
-
-function CraftSim.UTIL:Find(t, findFunc)
-    for k, v in pairs(t) do
-        if findFunc(v) then
-            return v, k
-        end
-    end
-
-    return false
-end
-
--- to concat lists together (behaviour unpredictable with tables that have strings or not ordered numbers as indices)
-function CraftSim.UTIL:Concat(tableList)
-    local finalList = {}
-    for _, currentTable in pairs(tableList) do
-        for _, item in pairs(currentTable) do
-            table.insert(finalList, item)
-        end
-    end
-    return finalList
-end
-
-function CraftSim.UTIL:GetMoneyValuesFromCopper(copperValue, formatString)
-    local gold = CraftSim.UTIL:round(copperValue/10000)
-    local silver = CraftSim.UTIL:round(copperValue/100000)
-    local copper = CraftSim.UTIL:round(copperValue/10000000)
-
-    if not formatString then
-        return gold, silver, copper
-    else
-        return gold .. "g " .. silver .. "s " .. copper .. "c"
-    end
-end
-
-
-function CraftSim.UTIL:FoldTable(t, foldFunction, startAtZero)
-    local foldedValue = nil
-    if #t < 2 and not startAtZero then
-        return t[1]
-    elseif #t < 1 and startAtZero then
-        return t[0]
-    end
-
-    local startIndex = 1
-    if startAtZero then
-        startIndex = 0
-    end
-    for index = startIndex, #t, 1 do
-        --print("folding.. current Value: " .. foldedValue)
-        if foldedValue == nil then
-            foldedValue = foldFunction(t[startIndex], t[startIndex + 1])
-        elseif index < #t then
-            foldedValue = foldFunction(foldedValue, t[index+1])
-        end
-    end
-
-    return foldedValue
+function CraftSim.UTIL:IsWorkOrder()
+    return ProfessionsFrame.OrdersPage.OrderView.OrderDetails:IsVisible()
 end
 
 function CraftSim.UTIL:FormatFactorToPercent(factor)
-    local percentText = CraftSim.UTIL:round((factor % 1) * 100)
+    local percentText = CraftSim.GUTIL:Round((factor % 1) * 100)
     return "+" .. percentText .. "%"
 end
 
 function CraftSim.UTIL:GreyOutByCondition(text, condition)
     if condition then
-        CraftSim.UTIL:ColorizeText(text, CraftSim.CONST.COLORS.GREY)
+        CraftSim.GUTIL:ColorizeText(text, CraftSim.GUTIL.COLORS.GREY)
     else
         return text
     end
-end
-
-function CraftSim.UTIL:ColorizeText(text, color)
-    local startLine = "\124"
-    local endLine = "\124r"
-    return startLine .. color .. text .. endLine
-end
-function CraftSim.UTIL:IconToText(iconPath, height) 
-    return "\124T" .. iconPath .. ":" .. height .. "\124t"
 end
 
 -- from stackoverflow: 
@@ -602,40 +333,98 @@ function CraftSim.UTIL:StopProfiling(label)
     local time = debugprofilestop()
     local diff = time - profilings[label]
     profilings[label] = nil
-    CraftSim_DEBUG:print("Elapsed Time for " .. label .. ": " .. CraftSim.UTIL:round(diff) .. " ms", CraftSim.CONST.DEBUG_IDS.PROFILING)
+    CraftSim_DEBUG:print("Elapsed Time for " .. label .. ": " .. CraftSim.GUTIL:Round(diff) .. " ms", CraftSim.CONST.DEBUG_IDS.PROFILING)
 end
 
-function CraftSim.UTIL:GetItemTooltipText(itemLink, showCount)
-    local tooltipData = C_TooltipInfo.GetHyperlink(itemLink)
+function CraftSim.UTIL:GetFormatter()
+    local b = CraftSim.GUTIL.COLORS.DARK_BLUE
+    local bb = CraftSim.GUTIL.COLORS.BRIGHT_BLUE
+    local g = CraftSim.GUTIL.COLORS.GREEN
+    local r = CraftSim.GUTIL.COLORS.RED
+    local l = CraftSim.GUTIL.COLORS.LEGENDARY
+    local e = CraftSim.GUTIL.COLORS.EPIC
+    local patreon = CraftSim.GUTIL.COLORS.PATREON
+    local c = function(text, color) 
+        return CraftSim.GUTIL:ColorizeText(text, color)
+    end
+    local p = "\n" .. CraftSim.GUTIL:GetQualityIconString(1, 15, 15) .. " "
+    local s = "\n" .. CraftSim.GUTIL:GetQualityIconString(2, 15, 15) .. " "
+    local P = "\n" .. CraftSim.GUTIL:GetQualityIconString(3, 15, 15) .. " "
+    local a = "\n     "
 
-    if not tooltipData then
-        return ""
+    local formatter = {}
+    formatter.b = function (text)
+        return c(text, b)
+    end
+    formatter.bb = function (text)
+        return c(text, bb)
+    end
+    formatter.g = function (text)
+        return c(text, g)
+    end
+    formatter.r = function (text)
+        return c(text, r)
+    end
+    formatter.l = function (text)
+        return c(text, l)
+    end
+    formatter.e = function (text)
+        return c(text, e)
+    end
+    formatter.patreon = function (text)
+        return c(text, patreon)
+    end
+    formatter.p = p
+    formatter.s = s
+    formatter.P = P
+    formatter.a = a
+    formatter.m = function (m)
+        return CraftSim.GUTIL:FormatMoney(m, true)
+    end
+    formatter.mw = function (m)
+        return CraftSim.GUTIL:FormatMoney(m)
     end
 
-    local tooltipText = ""
-    for _, line in pairs(tooltipData.lines) do
-        local lineText = ""
-        for _, arg in pairs(line.args) do
-            if arg.stringVal then
-                lineText = lineText .. arg.stringVal
+    formatter.i = function (i, h, w)
+        return CraftSim.GUTIL:IconToText(i, h, w)
+    end
+
+    formatter.cm = function(i, s) 
+        return CraftSim.MEDIA:GetAsTextIcon(i, s)
+    end
+
+    return formatter
+end
+
+function CraftSim.UTIL:GetSchematicFormByVisibility()
+    if ProfessionsFrame.CraftingPage.SchematicForm:IsVisible() then
+        return ProfessionsFrame.CraftingPage.SchematicForm
+    elseif ProfessionsFrame.OrdersPage.OrderView.OrderDetails.SchematicForm:IsVisible() then
+        return ProfessionsFrame.OrdersPage.OrderView.OrderDetails.SchematicForm
+    end
+end
+
+function CraftSim.UTIL:HasProfession(professionID)
+    local skilllineids = C_TradeSkillUI.GetAllProfessionTradeSkillLines()
+    local professionsChecked = 0
+    for _, id in pairs(skilllineids) do
+    
+        local info = C_TradeSkillUI.GetProfessionInfoBySkillLineID(id)
+
+        if info.maxSkillLevel > 0 then
+            professionsChecked = professionsChecked + 1
+            if info.profession == professionID then
+                return true
+            end
+
+            -- doesnt make sense to check more than the max learned professions per character
+            if professionsChecked >= 5 then
+                return false
             end
         end
-        tooltipText = tooltipText .. lineText .. "\n"
-    end
-
-    if showCount then
-        local itemCountInventory = GetItemCount(itemLink, false, false, true)
-        local itemCountTotal = GetItemCount(itemLink, true, false, true)
-        local itemCountBank = itemCountTotal - itemCountInventory
-        tooltipText = tooltipText .. "\n" .. "Owned: " .. itemCountTotal
-        if itemCountInventory > 0 then
-            tooltipText = tooltipText .. "\n" .. "- Inventory: " .. itemCountInventory
-        end
-        if itemCountBank > 0 then
-            tooltipText = tooltipText .. "\n" .. "- Bank: " .. itemCountBank
+        
+        if info.profession == professionID and info.maxSkillLevel > 0 then
+            return true
         end
     end
-
-    return tooltipText
 end
-

@@ -1,6 +1,36 @@
-AddonName, CraftSim = ...
+CraftSimAddonName, CraftSim = ...
 
 CraftSim.BLACKSMITHING_DATA = {}
+
+CraftSim.BLACKSMITHING_DATA.NODE_IDS = {
+    HAMMER_CONTROL = 42828,
+    SAFETY_SMITHING = 42827,
+    POIGNANT_PLANS = 42826,
+    SPECIALITY_SMITHING = 23765,
+    TOOLSMITHING = 23764,
+    STONEWORK = 23762,
+    SMELTING = 23761,
+    WEAPON_SMITHING = 23727,
+    BLADES = 23726,
+    HAFTED = 23723,
+    SHORT_BLADES = 23725,
+    LONG_BLADES = 23724,
+    MACES_AND_HAMMERS = 23722,
+    AXES_PICKS_AND_POLEARMS = 23721,
+    ARMOR_SMITHING = 23912,
+    BELTS = 23902,
+    BREASTPLATES = 23910,
+    FINE_ARMOR = 23903,
+    GAUNTLETS = 23900,
+    GREAVES = 23908,
+    HELMS = 23906,
+    LARGE_PLATE_ARMOR = 23911,
+    PAULDRONS = 23905,
+    SABATONS = 23904,
+    SCULPED_ARMOR = 23907,
+    SHIELDS = 23909,
+    VAMBRACES = 23901
+}
 
 CraftSim.BLACKSMITHING_DATA.NODES = function()
     return {
@@ -1230,6 +1260,7 @@ function CraftSim.BLACKSMITHING_DATA:GetData()
             376624, -- pvp
             367602, -- epic
             367618, -- epic
+            408288, -- belt clasp
         },
       },
       BELTS_2 = {
@@ -1241,6 +1272,7 @@ function CraftSim.BLACKSMITHING_DATA:GetData()
             376624, -- pvp
             367602, -- epic
             367618, -- epic
+            408288, -- belt clasp
         },
       },
       BELTS_3 = {
@@ -1252,6 +1284,7 @@ function CraftSim.BLACKSMITHING_DATA:GetData()
             376624, -- pvp
             367602, -- epic
             367618, -- epic
+            408288, -- belt clasp
         },
       },
       BELTS_4 = {
@@ -1263,6 +1296,7 @@ function CraftSim.BLACKSMITHING_DATA:GetData()
             376624, -- pvp
             367602, -- epic
             367618, -- epic
+            408288, -- belt clasp
         },
       },
       BELTS_5 = {
@@ -1274,6 +1308,7 @@ function CraftSim.BLACKSMITHING_DATA:GetData()
             376624, -- pvp
             367602, -- epic
             367618, -- epic
+            408288, -- belt clasp
         },
       },
       VAMBRACES_1 = {

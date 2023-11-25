@@ -1,89 +1,71 @@
-AddonName, CraftSim = ...
+CraftSimAddonName, CraftSim = ...
 
 CraftSim.NEWS = {}
 
 function CraftSim.NEWS:GET_NEWS()
     -- minimize names to make manual formatting easier :p
-    local b = CraftSim.CONST.COLORS.DARK_BLUE
-    local bb = CraftSim.CONST.COLORS.BRIGHT_BLUE
-    local g = CraftSim.CONST.COLORS.GREEN
-    local r = CraftSim.CONST.COLORS.RED
-    local l = CraftSim.CONST.COLORS.LEGENDARY
-    local c = function(text, color) 
-        return CraftSim.UTIL:ColorizeText(text, color)
-    end
-    local p = "\n" .. CraftSim.UTIL:GetQualityIconAsText(1, 15, 15) .. " "
-    local s = "\n" .. CraftSim.UTIL:GetQualityIconAsText(2, 15, 15) .. " "
-    local P = "\n" .. CraftSim.UTIL:GetQualityIconAsText(3, 15, 15) .. " "
-    local a = "\n     "
-    local function newP(v) return c("\n\n                                   --- Version " .. v .. " ---\n", l) end
+    local f = CraftSim.UTIL:GetFormatter()
+    local function newP(v) return f.l("\n\n                                   --- Version " .. v .. " ---\n") end
 
     return 
-        c("                   Hello and thank you for using CraftSim!\n", bb) .. 
-        c("                                 ( You are awesome! )", bb) ..
-        newP("6.2.3") ..
-        P .. "Optional and Finishing Reagents are now available in the " ..
-        a .. c("Live Preview", g) .. " and its recipe list is now sorted" ..
-        a .. "into categories to reduce the dropdown height" ..
-        s .. "Reagent Dropdowns now show a tooltip of" .. 
-        a .. "the optional reagent and how many you own" ..
-        p .. "Added a small loading text in Live Preview to" ..
-        a .. "show that data is currently requested from the crafter" ..
-        p .. "Fixed the " .. c("Material Optimization", bb) .. " not considering the" ..
-        a .. "skill modifier in simulation mode" ..
-        p .. "Postload reagent icons in Material Optimizations" ..
-        p .. "Fixed link intercept triggering for all links and not just " ..
-        a .. "for the live preview invite link (thx " .. c("https://github.com/comiluv", bb) ..
-        p .. "Added partial support for old world recipes for" .. 
-        a .. "cost overview and price override" ..
-        a .. c("Known Issue: ", r) .. "RecipeScan not working when used while" .. 
-        a .. "viewing non dragon flight recipes" ..
-        p .. "Fixed resourcefulness and multicraft item boni bug" .. 
-        p .. "Fixed Live Preview Crafting Costs" ..
-        newP("6.1") ..
-        P .. "Auto Reply now can take a third argument <ilvl> to specify the" ..
-        a .. "target item level. It checks which infusion or matrix" ..
-        a .. "it has to use to reach this itemlevel and then sims the recipe" ..
-        a .. "with it in mind" ..
-        p .. "Added a command preview to the Auto Reply Tab in the " .. 
-        a .. "Customer Service Module to show its syntax" ..
-        newP("6.0.1") ..
-        p .. "Fixed an error due to the Craft Result statistics display" ..
-        p .. "Utilizing ContinueOnItemLoad to lazy load the item links" .. 
-        a .. "in the Cost Overview Module" ..
-        newP("6.0.0") ..
-        P .. "New Module: " .. c("Customer Service", g) ..
-        a .. "New Feature: " .. c("Automatic Reply", g) .. " and" ..
-        a .. "New Feature: " .. c("Live Crafting Preview", g) ..
-        a .. "Send someone who has CraftSim an invite link to browse" ..
-        a .. "your recipes and possible results in a live session!" ..
-        a .. "For now it has some basic features and always optimizes for" ..
-        a .. "Inspiration, but many more features will come :)" ..
-        newP("5.5.6") ..
-        s .. c("Real / Expected Number of Procs Comparison", g) .. " in Craft Results" ..
-        p .. "Fixed Leatherworking Experimental Data not" .. 
-        a .. "recognizing some patterns" .. 
-        p .. "Owned number of commodities is now shown in" .. 
-        a .. "the " .. c("Cost Overview Module", bb) ..
-        newP("5.5.5") ..
-        p .. "Jewelcrafting Experimental Data fix by " .. c("github.com/SanjoSolutions", bb) ..
-        p .. "zhTW Translations added by " .. c("github.com/wxpenpen", bb) ..
-        newP("5.5.4") ..
-        p .. "The Craft Log of the Craft Results Module now uses" ..
-        a .. "the ScrollingMessageFrame template to ensure infinite scrolling" ..
-        newP("5.5.3") ..
-        p .. "Fixed an error occuring for non experimental data recipes" .. 
-        a .. "when parsing spec data" ..
-        p .. "Fixed an error occuring when enchanting gear or" ..
-        a .. "applying runes or other consumeables" ..
-        p .. "itIT Localization Updates by " .. c("Elitesparkle", bb) ..
-        p .. c("Known Issue:", r) .. " the craft log in the Craft Results" .. 
-        a .. "Module might stop listing crafts after around 100 crafts" .. 
-        a .. "However, the results are still correctly updated." .. 
-        a .. "This seems to be an issue with the max length of texts" .. 
-        a .. "and will be fixed in a future update" ..
-        newP("5.5.2") ..
-        p .. "Hotfix for RecipeScan" ..
-        newP("5.5.1") ..
-        p .. "Added an " .. c("Export Recipe Results", g) .. " Button to Crafting Results"
+        f.bb("                   Hello and thank you for using CraftSim!\n") .. 
+        f.bb("                                 ( You are awesome! )") ..
+        newP("9.0.3") ..
+        f.p .. "Fixed a bug with the " .. f.bb("Reset Frame Positions") .. " button" ..
+        newP("9.0.2") ..
+        f.p .. "Hotfixed an issue with the deploy process" .. 
+        f.a .. "not recognizing git submodules" ..
+        newP("9.0.1") ..
+        f.p .. "Code Refactorings regarding GGUI globalizations" ..
+        newP("9.0.0") ..
+        f.P .. "QOL Updates:" ..
+        f.s .. "Added a checkbox to the " .. f.bb("Recipe Scan") .. " module to " ..
+        f.a .. "optionally sort by relative profit instead of gold value" ..
+        f.s .. "Added a checkbox to the " .. f.bb("Recipe Scan") .. " module to " ..
+        f.a .. "use " ..f.bb("(Lesser) Illustrious Insight") .. " for recipes that" ..
+        f.a .. "allow it. Might be adding a feature to toggle any" .. 
+        f.a .. "Optional Reagents for scans at some point" .. 
+        f.s .. "Added a checkbox to the " .. f.bb("Craft Results") .. " module to" ..
+        f.a .. "disable any recording for a potential performance increase" ..
+        f.a .. "while crafting" ..
+        f.s .. "Automatically highlight all text for a " .. f.l("ForgeFinder Export") ..
+        f.s .. "Added a new " .. f.g("General Option") .. " to toggle this " .. f.bb("News") .. " Popup" ..
+        f.a .. "when logging in after a " .. f.l("CraftSim") .. " Update" ..
+        newP("8.9.4") ..
+        f.p .. "Added " .. f.l("10.2") ..  f.g(" Optional Reagents") ..
+        f.a .. "Thanks to " .. f.bb("https://github.com/TheResinger") .. " !" ..
+        newP("8.9.3") ..
+        f.p .. "Updated enchant recipes for 10.2" ..
+        f.p .. "Supporter List Update" ..
+        newP("8.9.2") ..
+        f.s .. "Expanded the " .. f.bb("Craft Statistics Panel") .." of the " .. f.bb("Average Profit Module") ..
+        f.a .. "to now also show " .. f.g("expected costs per item") .. 
+        f.a .. "with and without " .. f.g("sell return of lower qualities") ..
+        f.p .. "Added a new help icon (?) to explain the statistics table" ..
+        f.p .. "Fixed the " .. f.bb("Show Statistics") .. " button not updating its text when" ..
+        f.a .. "closing the " .. f.bb("Statistics Module") ..
+        f.p .. "Supporter List Update" ..
+        newP("8.9.1") ..
+        f.P .. "10.1.5 Fix" ..
+        f.p .. "Supporter List Update" ..
+        newP("8.9.0") ..
+        f.P .. "Thank you " .. f.bb("https://github.com/Kanegasi") .. " for" ..
+        f.a .. "adding " .. f.g("Oribos Exchange") .. " to the possible price sources" ..
+        f.s .. "Fixed a bug in the " .. f.bb("Knowledge Point Simulator") .. " that" ..
+        f.a .. "did not correctly reset a node when subtracting" .. 
+        f.a .. "with the -5 Button below 0" ..
+        f.s .. f.bb("Profit Calculation") .." for " .. f.bb("Crafting Orders") .. " now correctly considers" ..
+        f.a .. "materials that were provided by the customer" ..
+        f.p .. "Added the " .. f.bb("Prospecting") .. " Talent Node to" .. f.bb(" Dragon Isles Crushing") ..
+        f.a .. "for " .. f.bb("Specialization Info") ..
+        f.p .. "Added an additional dropdown frame into the" .. 
+        f.a .. "frame pool for optional and finishing reagents" ..
+        f.a .. "to support the new tailoring pvp gear" ..
+        newP("8.8.0") ..
+        f.s .. "Updates and Fixes to the " .. f.bb("CustomerHistory") .. " Module by" ..
+        f.a .. f.bb("https://github.com/Meivyn") .. 
+        f.p .. "Supporter List Update" ..
+        f.p .. "Bugfix for Specialization Node Info" ..
+        f.a .. "regarding the Shadowbelt Clasp Recipe by" ..
+        f.a .. f.bb("https://github.com/domi1294")
 end

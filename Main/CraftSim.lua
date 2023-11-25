@@ -1,10 +1,13 @@
-AddonName, CraftSim = ...
+CraftSimAddonName, CraftSim = ...
 
 CraftSim.MAIN = CreateFrame("Frame", "CraftSimAddon")
 CraftSim.MAIN:SetScript("OnEvent", function(self, event, ...) self[event](self, ...) end)
 CraftSim.MAIN:RegisterEvent("ADDON_LOADED")
 CraftSim.MAIN:RegisterEvent("PLAYER_LOGIN")
 CraftSim.MAIN:RegisterEvent("COMBAT_LOG_EVENT_UNFILTERED")
+CraftSim.MAIN:RegisterEvent("PLAYER_ENTERING_WORLD")
+
+CraftSim.MAIN.FRAMES = {}
 
 CraftSimOptions = CraftSimOptions or {
 	priceDebug = false,
@@ -20,29 +23,27 @@ CraftSimOptions = CraftSimOptions or {
 	openLastRecipe = true,
 	materialSuggestionInspirationThreshold = false,
 	topGearAutoUpdate = false,
+	optionsShowNews = true,
 
 	-- modules
 	modulesMaterials = true,
 	modulesStatWeights = true,
 	modulesTopGear = true,
-	modulesCostOverview = true,
+	modulesPriceDetails = true,
 	modulesSpecInfo = true,
 	modulesPriceOverride = false,
 	modulesRecipeScan = false,
 	modulesCraftResults = false,
 	modulesCustomerService = false,
+	modulesCustomerHistory = false,
+	modulesCostDetails = false,
 
 	transparencyMaterials = 1,
 	transparencyStatWeights = 1,
 	transparencyTopGear = 1,
 	transparencyCostOverview = 1,
 	transparencySpecInfo = 1,
-
-	-- specData
-	blacksmithingEnabled = false,
-	alchemyEnabled = false,
-	jewelcraftingEnabled = false,
-	leatherworkingEnabled = false,
+	maxHistoryEntriesPerClient = 200,
 
 	-- recipeScan
 	recipeScanIncludeSoulbound = false,
@@ -51,11 +52,10 @@ CraftSimOptions = CraftSimOptions or {
 	recipeScanOptimizeProfessionTools = false,
 
 	-- profit calc
+	customMulticraftConstant = CraftSim.CONST.MULTICRAFT_CONSTANT,
 
 	-- customer service module
-	customerServiceAutoReplyCommand = "!craft",
-	customerServiceEnableAutoReply = false,
-	customerServiceAutoReplyFormat =
+	customerServiceRecipeWhisperFormat =
 			"Highest Result: %gc\n" ..
             "with Inspiration: %ic (%insp)\n" ..
             "Crafting Costs: %cc\n" ..
@@ -63,15 +63,31 @@ CraftSimOptions = CraftSimOptions or {
 
 	customerServiceAllowAutoResult = true,
 	customerServiceActivePreviewIDs = {},
+
+	-- crafting options
+	craftGarbageCollectEnabled = true,
+	craftGarbageCollectCrafts = 500,
 }
 
-CraftSimCollapsedFrames = CraftSimCollapsedFrames or {}
+CraftSimGGUIConfig = CraftSimGGUIConfig or {}
 
+---@type CraftSim.RecipeData?
 CraftSim.MAIN.currentRecipeData = nil
+---@type number?
 CraftSim.MAIN.currentRecipeID = nil
+CraftSim.MAIN.initialLogin = false
+CraftSim.MAIN.isReloadingUI = false
 
-local function print(text, recursive) -- override
-	CraftSim_DEBUG:print(text, CraftSim.CONST.DEBUG_IDS.MAIN, recursive)
+local print = CraftSim.UTIL:SetDebugPrint(CraftSim.CONST.DEBUG_IDS.MAIN)
+function CraftSim.MAIN:PLAYER_ENTERING_WORLD(initialLogin, isReloadingUI)
+	CraftSim.MAIN.initialLogin = initialLogin
+	CraftSim.MAIN.isReloadingUI = isReloadingUI
+
+	-- for any processes that may only happen once a session e.g.
+	if initialLogin then
+		-- Clear Preview IDs upon fresh session
+		CraftSim.CUSTOMER_SERVICE:ClearPreviewIDs()
+	end
 end
 
 function CraftSim.MAIN:COMBAT_LOG_EVENT_UNFILTERED(event)
@@ -112,13 +128,16 @@ function CraftSim.MAIN:handleCraftSimOptionsUpdates()
 		CraftSimOptions.transparencyTopGear = CraftSimOptions.transparencyTopGear or 1
 		CraftSimOptions.transparencyCostOverview = CraftSimOptions.transparencyCostOverview or 1
 		CraftSimOptions.transparencySpecInfo = CraftSimOptions.transparencySpecInfo or 1
+		CraftSimOptions.maxHistoryEntriesPerClient = CraftSimOptions.maxHistoryEntriesPerClient or 200
 		CraftSimOptions.customerServiceActivePreviewIDs = CraftSimOptions.customerServiceActivePreviewIDs or {}
-		CraftSimOptions.customerServiceAutoReplyCommand = CraftSimOptions.customerServiceAutoReplyCommand or "!craft"
-		CraftSimOptions.customerServiceAutoReplyFormat = CraftSimOptions.customerServiceAutoReplyFormat or
-																		("Highest Result: %gc\n" ..
-																		"with Inspiration: %ic (%insp)\n" ..
-																		"Crafting Costs: %cc\n" ..
-																		"%ccd")
+		CraftSimOptions.customerServiceRecipeWhisperFormat = CraftSimOptions.customerServiceRecipeWhisperFormat or
+		("Highest Result: %gc\n" ..
+		"with Inspiration: %ic (%insp)\n" ..
+		"Crafting Costs: %cc\n" ..
+		"%ccd")
+		CraftSimOptions.craftGarbageCollectCrafts = CraftSimOptions.craftGarbageCollectCrafts or 500
+		CraftSimOptions.customMulticraftConstant = CraftSimOptions.customMulticraftConstant or CraftSim.CONST.MULTICRAFT_CONSTANT
+		CraftSimOptions.customResourcefulnessConstant = CraftSimOptions.customResourcefulnessConstant or CraftSim.CONST.BASE_RESOURCEFULNESS_AVERAGE_SAVE_FACTOR
 		if CraftSimOptions.detailedCraftingInfoTooltip == nil then
 			CraftSimOptions.detailedCraftingInfoTooltip = true
 		end
@@ -134,8 +153,8 @@ function CraftSim.MAIN:handleCraftSimOptionsUpdates()
 		if CraftSimOptions.modulesTopGear == nil then
 			CraftSimOptions.modulesTopGear = true
 		end
-		if CraftSimOptions.modulesCostOverview == nil then
-			CraftSimOptions.modulesCostOverview = true
+		if CraftSimOptions.modulesPriceDetails == nil then
+			CraftSimOptions.modulesPriceDetails = true
 		end
 		if CraftSimOptions.modulesSpecInfo == nil then
 			CraftSimOptions.modulesSpecInfo = true
@@ -143,28 +162,42 @@ function CraftSim.MAIN:handleCraftSimOptionsUpdates()
 		if CraftSimOptions.customerServiceAllowAutoResult == nil then
 			CraftSimOptions.customerServiceAllowAutoResult = true
 		end
+		if CraftSimOptions.craftGarbageCollectEnabled == nil then
+			CraftSimOptions.craftGarbageCollectEnabled = true
+		end
+		if CraftSimOptions.optionsShowNews == nil then
+			CraftSimOptions.optionsShowNews = true
+		end
 	end
 end
 
 local hookedEvent = false
 
 local freshLoginRecall = true
+local lastCallTime = 0
 function CraftSim.MAIN:TriggerModulesErrorSafe(isInit)
+
+	local callTime = GetTime()
+	if lastCallTime == callTime then
+		print("SAME FRAME, RETURN")
+		return
+	else
+		print("NEW FRAME, CONTINUE")
+	end
+
+	print("lastCallTime: " .. tostring(lastCallTime))
+	print("callTime: " .. tostring(callTime))
+
+	lastCallTime = callTime
 
 	if freshLoginRecall and isInit then
 		freshLoginRecall = false
 		-- hack to make frames appear after fresh login, when some info has not loaded yet although should have after blizzards' Init call
-		C_Timer.After(0.1, function() 
+		C_Timer.After(0.1, function()
 			CraftSim.MAIN:TriggerModulesErrorSafe(true)
 		end)
 	end
 
-	-- local success, errorMsg = pcall(CraftSim.MAIN.TriggerModulesByRecipeType, self, isInit)
-
-	-- if not success then
-	-- 	CraftSim.FRAME:ShowError(tostring(errorMsg), "CraftSim Error")
-	-- 	print(CraftSim.UTIL:ColorizeText(tostring(errorMsg), CraftSim.CONST.COLORS.RED), CraftSim.CONST.DEBUG_IDS.ERROR)
-	-- end
 	CraftSim.UTIL:StartProfiling("MODULES UPDATE")
 	CraftSim.MAIN:TriggerModulesByRecipeType(isInit)
 	CraftSim.UTIL:StopProfiling("MODULES UPDATE")
@@ -183,23 +216,21 @@ function CraftSim.MAIN:HookToEvent()
 		end
 	end
 
-	
+
 	local function Init(self, recipeInfo)
 		if not self:IsVisible() then
 			return
 		end
-		print("recipeinfo", false, true)
-		print(recipeInfo)
 		-- if init turn sim mode off
 		if CraftSim.SIMULATION_MODE.isActive then
 			CraftSim.SIMULATION_MODE.isActive = false
-			CraftSim.SIMULATION_MODE.toggleButton:SetChecked(false)
+			CraftSim.SIMULATION_MODE.FRAMES.WORKORDER.toggleButton:SetChecked(false)
+			CraftSim.SIMULATION_MODE.FRAMES.NO_WORKORDER.toggleButton:SetChecked(false)
 		end
-		
+
 		if recipeInfo then
 			print("Init: " .. tostring(recipeInfo.recipeID))
 			CraftSim.MAIN.currentRecipeID = recipeInfo.recipeID
-			CraftSim.MAIN:TriggerModulesErrorSafe(true)
 
 			local professionInfo = C_TradeSkillUI.GetChildProfessionInfo()
 			local professionRecipeIDs = CraftSim.CACHE:GetCacheEntryByVersion(CraftSimRecipeIDs, professionInfo.profession)
@@ -211,8 +242,13 @@ function CraftSim.MAIN:HookToEvent()
 					CraftSim.CACHE:AddCacheEntryByVersion(CraftSimRecipeIDs, professionInfo.profession, recipeIDs)
 				end
 			end
+
+			CraftSim.CACHE:TriggerRecipeOperationInfoLoadForProfession(professionRecipeIDs, professionInfo.profession)
+			CraftSim.MAIN:TriggerModulesErrorSafe(true)
+			CraftSim.CACHE:BuildRecipeMap(professionInfo, recipeInfo.recipeID)
 		else
-			--print("loading recipeInfo..")
+			print("Hide all frames recipeInfo nil")
+			CraftSim.MAIN:HideAllFrames()
 		end
 	end
 
@@ -232,41 +268,26 @@ function CraftSim.MAIN:HookToEvent()
 
 	recipeTab:HookScript("OnClick", Update)
 	craftingOrderTab:HookScript("OnClick", Update)
-	
+
 end
 
 function CraftSim.MAIN:InitStaticPopups()
-	StaticPopupDialogs["CRAFT_SIM_ACCEPT_TOOLTIP_SYNC"] = {
-        text = "Incoming Craft Sim Account Sync: Do you accept?",
-        button1 = "Yes",
-        button2 = "No",
-        OnAccept = function(self, data1, data2)
-            CraftSim.ACCOUNTSYNC:HandleIncomingSync(data1, data2)
-        end,
-        timeout = 0,
-        whileDead = true,
-        hideOnEscape = true,
-        preferredIndex = 3,  -- avoid some UI taint, see http://www.wowace.com/announcements/how-to-avoid-some-ui-taint/
-      }
-
 	StaticPopupDialogs["CRAFT_SIM_ACCEPT_NO_PRICESOURCE_WARNING"] = {
-	text = "Are you sure you do not want to be reminded to get a price source?",
-	button1 = "Yes",
-	button2 = "No",
-	OnAccept = function(self, data1, data2)
-		CraftSimOptions.doNotRemindPriceSource = true
-		CraftSim.FRAME:GetFrame(CraftSim.CONST.FRAMES.WARNING):Hide()
-	end,
-	timeout = 0,
-	whileDead = true,
-	hideOnEscape = true,
-	preferredIndex = 3,  -- avoid some UI taint, see http://www.wowace.com/announcements/how-to-avoid-some-ui-taint/
+		text = "Are you sure you do not want to be reminded to get a price source?",
+		button1 = "Yes",
+		button2 = "No",
+		OnAccept = function(self, data1, data2)
+			CraftSimOptions.doNotRemindPriceSource = true
+		end,
+		timeout = 0,
+		whileDead = true,
+		hideOnEscape = true,
+		preferredIndex = 3,  -- avoid some UI taint, see http://www.wowace.com/announcements/how-to-avoid-some-ui-taint/
 	}
 end
 
-local priceApiLoaded = false
 function CraftSim.MAIN:ADDON_LOADED(addon_name)
-	if addon_name == AddonName then
+	if addon_name == CraftSimAddonName then
 		CraftSim.LOCAL:Init()
 		CraftSim.MAIN:handleCraftSimOptionsUpdates()
 
@@ -274,10 +295,9 @@ function CraftSim.MAIN:ADDON_LOADED(addon_name)
 		CraftSim.AVERAGEPROFIT.FRAMES:Init()
 		CraftSim.AVERAGEPROFIT.FRAMES:InitExplanation()
 		CraftSim.TOPGEAR.FRAMES:Init()
-		CraftSim.COSTOVERVIEW.FRAMES:Init()
+		CraftSim.PRICE_DETAILS.FRAMES:Init()
 		CraftSim.REAGENT_OPTIMIZATION.FRAMES:Init()
 		CraftSim.SPECIALIZATION_INFO.FRAMES:Init()
-		CraftSim.FRAME:InitWarningFrame()
 		CraftSim.FRAME:InitOneTimeNoteFrame()
 		CraftSim.SIMULATION_MODE.FRAMES:Init()
 		CraftSim.SIMULATION_MODE.FRAMES:InitSpecModifier()
@@ -287,6 +307,10 @@ function CraftSim.MAIN:ADDON_LOADED(addon_name)
 		CraftSim.STATISTICS.FRAMES:Init()
 		CraftSim.CUSTOMER_SERVICE.FRAMES:Init()
 		CraftSim.CUSTOMER_SERVICE.FRAMES:InitLivePreview()
+		CraftSim.CUSTOMER_HISTORY.FRAMES:Init()
+		CraftSim.CRAFTDATA.FRAMES:Init()
+		CraftSim.COST_DETAILS.FRAMES:Init()
+		CraftSim.SUPPORTERS.FRAMES:Init()
 
 		CraftSim.TOOLTIP:Init()
 		CraftSim.MAIN:HookToEvent()
@@ -294,19 +318,27 @@ function CraftSim.MAIN:ADDON_LOADED(addon_name)
 		CraftSim.FRAME:HandleAuctionatorOverlaps()
 		CraftSim.MAIN:HandleAuctionatorHooks()
 		CraftSim.ACCOUNTSYNC:Init()
-		
+
 
 		CraftSim.CONTROL_PANEL.FRAMES:Init()
 		CraftSim.MAIN:InitStaticPopups()
+		CraftSim.GGUI:InitializePopup({
+			backdropOptions=CraftSim.CONST.DEFAULT_BACKDROP_OPTIONS,
+			sizeX=300, sizeY=300, title="CraftSim Popup", frameID=CraftSim.CONST.FRAMES.POPUP,
+		})
 
 		CraftSim.CUSTOMER_SERVICE:Init()
+		CraftSim.CUSTOMER_HISTORY:Init()
+		CraftSim.CRAFTDATA:Init()
+
+		CraftSim.FRAME:RestoreModulePositions()
 	end
 end
 
 function CraftSim.MAIN:HandleAuctionatorHooks()
 ---@diagnostic disable-next-line: undefined-global
 	if Auctionator then
-		Auctionator.API.v1.RegisterForDBUpdate(AddonName, function() 
+		Auctionator.API.v1.RegisterForDBUpdate(CraftSimAddonName, function()
 			print("Auctionator DB Update")
 			CraftSim.MAIN:TriggerModulesErrorSafe(false)
 		end)
@@ -329,11 +361,11 @@ function CraftSim.MAIN:HookToProfessionsFrame()
 	end
 	professionFrameHooked = true
 
-	ProfessionsFrame:HookScript("OnShow", 
+	ProfessionsFrame:HookScript("OnShow",
    function()
 		CraftSim.MAIN.lastRecipeID = nil
 		if CraftSimOptions.openLastRecipe then
-			C_Timer.After(1, function() 
+			C_Timer.After(1, function()
 				local recipeInfo = ProfessionsFrame.CraftingPage.SchematicForm:GetRecipeInfo()
 				local professionInfo = ProfessionsFrame:GetProfessionInfo()
 				local professionFullName = professionInfo.professionName
@@ -345,7 +377,7 @@ function CraftSim.MAIN:HookToProfessionsFrame()
 		end
    end)
 
-   ProfessionsFrame.CraftingPage:HookScript("OnHide", 
+   ProfessionsFrame.CraftingPage:HookScript("OnHide",
    function()
 	local professionInfo = ProfessionsFrame:GetProfessionInfo()
 	local profession = professionInfo.parentProfessionName
@@ -363,8 +395,8 @@ function CraftSim.MAIN:PLAYER_LOGIN()
 	SlashCmdList["CRAFTSIM"] = function(input)
 
 		input = SecureCmdOptionParse(input)
-		if not input then 
-			return 
+		if not input then
+			return
 		end
 
 		local command, rest = input:match("^(%S*)%s*(.-)$")
@@ -383,11 +415,13 @@ function CraftSim.MAIN:PLAYER_LOGIN()
 		elseif command == "news" then
 			CraftSim.FRAME:ShowOneTimeInfo(true)
 		elseif command == "debug" then
-			CraftSim.FRAME:GetFrame(CraftSim.CONST.FRAMES.DEBUG):Show()
+			CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.DEBUG):Show()
 		elseif command == "export" then
-			local exportString = CraftSim.DATAEXPORT:GetExportString()
-			CraftSim.UTIL:KethoEditBox_Show(exportString)
-		else 
+			if CraftSim.MAIN.currentRecipeData then
+				local json = CraftSim.MAIN.currentRecipeData:GetJSON()
+				CraftSim.UTIL:KethoEditBox_Show(json)
+			end
+		else
 			-- open options if any other command or no command is given
 			InterfaceOptionsFrame_OpenToCategory(CraftSim.OPTIONS.optionsPanel)
 		end
@@ -395,31 +429,89 @@ function CraftSim.MAIN:PLAYER_LOGIN()
 
 	CraftSim.PRICE_API:InitPriceSource()
 	CraftSim.OPTIONS:Init()
-	CraftSim.MAIN:HandleCollapsedFrameSave()
+	--CraftSim.MAIN:HandleCollapsedFrameSave()
 
 	-- show one time note
-	CraftSim.FRAME:ShowOneTimeInfo()
+	if CraftSimOptions.optionsShowNews then
+		CraftSim.FRAME:ShowOneTimeInfo()
+	end
 end
 
-local debugTest = true
+function CraftSim.MAIN:HideAllFrames(keepControlPanel)
+	local craftResultsFrame = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.CRAFT_RESULTS)
+	local customerServiceFrame = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.CUSTOMER_SERVICE)
+	local customerHistoryFrame = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.CUSTOMER_HISTORY)
+	local priceOverrideFrame = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.PRICE_OVERRIDE)
+	local priceOverrideFrameWO = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.PRICE_OVERRIDE_WORK_ORDER)
+	local specInfoFrame = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.SPEC_INFO)
+	local specInfoFrameWO = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.SPEC_INFO_WO)
+	local averageProfitFrame = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.STAT_WEIGHTS)
+	local averageProfitFrameWO = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.STAT_WEIGHTS_WORK_ORDER)
+	local topgearFrame = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.TOP_GEAR)
+	local topgearFrameWO = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.TOP_GEAR_WORK_ORDER)
+	local materialOptimizationFrame = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.MATERIALS)
+	local materialOptimizationFrameWO = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.MATERIALS_WORK_ORDER)
+	-- hide control panel and return
+	if not keepControlPanel then
+		CraftSim.CONTROL_PANEL.frame:Hide()
+	end
+	-- hide all modules
+	CraftSim.RECIPE_SCAN.frame:Hide()
+	craftResultsFrame:Hide()
+	customerServiceFrame:Hide()
+	customerHistoryFrame:Hide()
+	priceOverrideFrame:Hide()
+	priceOverrideFrameWO:Hide()
+	specInfoFrame:Hide()
+	specInfoFrameWO:Hide()
+	averageProfitFrame:Hide()
+	averageProfitFrameWO:Hide()
+	topgearFrame:Hide()
+	topgearFrameWO:Hide()
+	CraftSim.PRICE_DETAILS.frame:Hide()
+	CraftSim.PRICE_DETAILS.frameWO:Hide()
+	CraftSim.COST_DETAILS.frame:Hide()
+	CraftSim.COST_DETAILS.frameWO:Hide()
+	materialOptimizationFrame:Hide()
+	materialOptimizationFrameWO:Hide()
+	CraftSim.CRAFTDATA.frame:Hide()
+	-- hide sim mode toggle button
+	CraftSim.SIMULATION_MODE.FRAMES.WORKORDER.toggleButton:Hide()
+	CraftSim.SIMULATION_MODE.FRAMES.NO_WORKORDER.toggleButton:Hide()
+end
+
 function CraftSim.MAIN:TriggerModulesByRecipeType(isInit)
 	if not ProfessionsFrame:IsVisible() then
 		return
 	end
 
-	local controlPanel = CraftSim.FRAME:GetFrame(CraftSim.CONST.FRAMES.CONTROL_PANEL)
+	local craftResultsFrame = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.CRAFT_RESULTS)
+	local customerServiceFrame = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.CUSTOMER_SERVICE)
+	local customerHistoryFrame = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.CUSTOMER_HISTORY)
+	local priceOverrideFrame = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.PRICE_OVERRIDE)
+	local priceOverrideFrameWO = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.PRICE_OVERRIDE_WORK_ORDER)
+	local specInfoFrame = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.SPEC_INFO)
+	local specInfoFrameWO = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.SPEC_INFO_WO)
+	local averageProfitFrame = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.STAT_WEIGHTS)
+	local averageProfitFrameWO = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.STAT_WEIGHTS_WORK_ORDER)
+	local topgearFrame = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.TOP_GEAR)
+	local topgearFrameWO = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.TOP_GEAR_WORK_ORDER)
+	local materialOptimizationFrame = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.MATERIALS)
+	local materialOptimizationFrameWO = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.MATERIALS_WORK_ORDER)
+
 	if C_TradeSkillUI.IsNPCCrafting() or C_TradeSkillUI.IsRuneforging() or C_TradeSkillUI.IsTradeSkillLinked() or C_TradeSkillUI.IsTradeSkillGuild() then
-		-- hide control panel and return
-		controlPanel:Hide()
-		return nil
+		CraftSim.MAIN:HideAllFrames()
+		return
 	end
 
-	controlPanel:Show()
+	CraftSim.CONTROL_PANEL.frame:Show()
 
     local recipeInfo =  C_TradeSkillUI.GetRecipeInfo(CraftSim.MAIN.currentRecipeID)
 
-	if not recipeInfo then
-		--print("no recipeInfo found.. try again soon?")
+	if not recipeInfo or recipeInfo.isGatheringRecipe then
+		print("gathering recipe: hide frames")
+		-- hide all modules
+		CraftSim.MAIN:HideAllFrames(true)
 		return
 	end
 
@@ -427,183 +519,177 @@ function CraftSim.MAIN:TriggerModulesByRecipeType(isInit)
 
 	print("Export Mode: " .. tostring(exportMode))
 
-	local recipeData = nil 
+	local recipeData = nil
 	if CraftSim.SIMULATION_MODE.isActive and CraftSim.SIMULATION_MODE.recipeData then
 		recipeData = CraftSim.SIMULATION_MODE.recipeData
 		CraftSim.MAIN.currentRecipeData = CraftSim.SIMULATION_MODE.recipeData
 	else
-		recipeData = CraftSim.DATAEXPORT:exportRecipeData(recipeInfo.recipeID, exportMode)
-	end
+		local schematicForm = CraftSim.UTIL:GetSchematicFormByVisibility()
 
-	if debugTest then
-		recipeData = nil
-		debugTest = false
-	end
+		if not schematicForm then
+			print("CraftSim MAIN: No SchematicForm Visible")
+			return
+		end
+		-- set recraft based on visibility
+		local currentTransaction = schematicForm:GetTransaction()
+		if not currentTransaction then
+			print("CraftSim MAIN: SchematicForm without transaction!")
+			return
+		end
+		local isRecraft = currentTransaction:GetRecraftAllocation() ~= nil
+		local isWorkOrder = CraftSim.UTIL:IsWorkOrder()
 
-	local recipeType = recipeData and recipeData.recipeType
-    --print("trigger by recipeType.. " .. tostring(recipeType))
+		recipeData = CraftSim.RecipeData(recipeInfo.recipeID, isRecraft, isWorkOrder)
 
-	local priceData = CraftSim.PRICEDATA:GetPriceData(recipeData, recipeType)
-    -- when to see what?
-    -- top gear: everything that is sellable!
-    -- stat weights: everything that is sellable!
-    -- Cost overview: crafting costs -> always!
-    -- Cost overview: profit per quality -> everything that is sellable!
-    -- Material allocation highest reachable quality with min costs -> always
-    -- Material allocation most profitable allocation -> everything that is sellable
+		if recipeData then
+			-- Set Reagents based on visibleFrame and load equipped profession gear set
+			recipeData:SetAllReagentsBySchematicForm()
+			recipeData:SetEquippedProfessionGearSet()
 
-    local showMaterialAllocation = false
-    local showStatweights = false
-    local showTopGear = false
-    local showCostOverview = false
-	local showSimulationMode = false
-	local showSpecInfo = false
-	local showPriceOverride = false
-	
-	-- always on modules
-	local showCraftResults = true
-	local showRecipeScan = true
-	local showCustomerService = true
-
-	if recipeData and priceData then
-		--CraftSim.DATAEXPORT:UpdateTooltipData(recipeData)
-		-- TODO: on demand
-
-		if recipeData.isRecraft then
-			-- show everything
-			showMaterialAllocation = true
-			showTopGear = true
-			showCostOverview = true
-			showStatweights = true
-			showSimulationMode = true
-			showSpecInfo = true
-			showPriceOverride = true
-		elseif recipeType == CraftSim.CONST.RECIPE_TYPES.GEAR or recipeType == CraftSim.CONST.RECIPE_TYPES.MULTIPLE or recipeType == CraftSim.CONST.RECIPE_TYPES.SINGLE then
-			-- show everything
-			showMaterialAllocation = true
-			showTopGear = true
-			showCostOverview = true
-			showStatweights = true
-			showSimulationMode = true
-			showSpecInfo = true
-			showPriceOverride = true
-		elseif recipeType == CraftSim.CONST.RECIPE_TYPES.ENCHANT then
-			showTopGear = true
-			showCostOverview = true
-			showStatweights = true
-			showSimulationMode = true
-			showSpecInfo = true
-			showPriceOverride = true
-		elseif recipeType == CraftSim.CONST.RECIPE_TYPES.NO_QUALITY_MULTIPLE or recipeType == CraftSim.CONST.RECIPE_TYPES.NO_QUALITY_SINGLE then
-			-- show everything except material allocation and total cost overview
-			showTopGear = true
-			showCostOverview = true
-			showStatweights = true
-			showSimulationMode = true
-			showSpecInfo = true
-			showPriceOverride = true
-		elseif recipeType == CraftSim.CONST.RECIPE_TYPES.SOULBOUND_GEAR or recipeType == CraftSim.CONST.RECIPE_TYPES.NO_ITEM then
-			-- show crafting costs and highest material allocation
-			showCostOverview = true
-			showMaterialAllocation = true
-			-- also show top gear cause we have different modes now
-			showTopGear = true
-			showSimulationMode = true
-			showSpecInfo = true
-			showStatweights = true
-			showPriceOverride = true
-		elseif recipeType == CraftSim.CONST.RECIPE_TYPES.NO_CRAFT_OPERATION then
-			showCostOverview = true
-			showPriceOverride = true
-		elseif recipeType == CraftSim.CONST.RECIPE_TYPES.GATHERING then
-			-- show nothing maybe later some top gear for gathering
+			CraftSim.MAIN.currentRecipeData = recipeData
 		end
 	end
 
-	showMaterialAllocation = showMaterialAllocation and CraftSimOptions.modulesMaterials 
-	-- temporary disable for recipes with only one required qualitity reagent
-	--showMaterialAllocation = showMaterialAllocation and recipeData and recipeData.numReagentsWithQuality > 1
+    local showMaterialOptimization = false
+    local showStatweights = false
+    local showTopGear = false
+	local showSimulationMode = false
+	local showSpecInfo = false
+
+	-- always on modules
+    local showCostOverview = true
+	local showPriceOverride = true
+	local showCraftResults = true
+	local showRecipeScan = true
+	local showCustomerService = true
+	local showCustomerHistory = true
+	local showCraftData = true
+	local showCostDetails = true
+
+
+	if recipeData.supportsCraftingStats then
+		showStatweights = true
+		showTopGear = true
+	end
+
+	if recipeData.hasQualityReagents then
+		showMaterialOptimization = true
+	end
+
+	if not recipeData.isCooking and not recipeData.isOldWorldRecipe then
+		showSpecInfo = true
+	end
+	showSimulationMode = not recipeData.isOldWorldRecipe
+
+
+	showMaterialOptimization = showMaterialOptimization and CraftSimOptions.modulesMaterials
 	showStatweights = showStatweights and CraftSimOptions.modulesStatWeights
 	showTopGear = showTopGear and CraftSimOptions.modulesTopGear
-	showCostOverview = showCostOverview and CraftSimOptions.modulesCostOverview
+	showCostOverview = showCostOverview and CraftSimOptions.modulesPriceDetails
 	showSpecInfo = showSpecInfo and CraftSimOptions.modulesSpecInfo
 	showPriceOverride = showPriceOverride and CraftSimOptions.modulesPriceOverride
 	showRecipeScan = showRecipeScan and CraftSimOptions.modulesRecipeScan
 	showCraftResults = showCraftResults and CraftSimOptions.modulesCraftResults
 	showCustomerService = showCustomerService and CraftSimOptions.modulesCustomerService
-	
-	CraftSim.FRAME:ToggleFrame(CraftSim.FRAME:GetFrame(CraftSim.CONST.FRAMES.RECIPE_SCAN), showRecipeScan)
-	CraftSim.FRAME:ToggleFrame(CraftSim.FRAME:GetFrame(CraftSim.CONST.FRAMES.CRAFT_RESULTS), showCraftResults)
-	CraftSim.FRAME:ToggleFrame(CraftSim.FRAME:GetFrame(CraftSim.CONST.FRAMES.CUSTOMER_SERVICE), showCustomerService)
+	showCustomerHistory = showCustomerHistory and CraftSimOptions.modulesCustomerHistory
+	showCraftData = showCraftData and CraftSimOptions.modulesCraftData
+	showCostDetails = showCostDetails and CraftSimOptions.modulesCostDetails
+
+	CraftSim.FRAME:ToggleFrame(CraftSim.RECIPE_SCAN.frame, showRecipeScan)
+	CraftSim.FRAME:ToggleFrame(craftResultsFrame, showCraftResults)
+	CraftSim.FRAME:ToggleFrame(customerServiceFrame, showCustomerService)
+	CraftSim.FRAME:ToggleFrame(customerHistoryFrame, showCustomerHistory)
+
+
+
+	-- Simulation Mode (always update first because it changes recipeData based on simMode inputs)
+	showSimulationMode = showSimulationMode and recipeData and not recipeData.isSalvageRecipe
+	CraftSim.FRAME:ToggleFrame(CraftSim.SIMULATION_MODE.FRAMES.WORKORDER.toggleButton,showSimulationMode and exportMode == CraftSim.CONST.EXPORT_MODE.WORK_ORDER)
+	CraftSim.FRAME:ToggleFrame(CraftSim.SIMULATION_MODE.FRAMES.NO_WORKORDER.toggleButton, showSimulationMode and exportMode == CraftSim.CONST.EXPORT_MODE.NON_WORK_ORDER)
+	CraftSim.SIMULATION_MODE.FRAMES:UpdateVisibility() -- show sim mode frames depending if active or not
+	if CraftSim.SIMULATION_MODE.isActive and recipeData then
+		-- update simulationframe recipedata by inputs and the frontend
+		-- since recipeData is a reference here to the recipeData in the simulationmode,
+		-- the recipeData that is used in the below modules should also be the modified one!
+		CraftSim.SIMULATION_MODE:UpdateSimulationMode()
+	end
+
+	CraftSim.FRAME:ToggleFrame(CraftSim.COST_DETAILS.frame, showCostDetails and exportMode == CraftSim.CONST.EXPORT_MODE.NON_WORK_ORDER)
+	CraftSim.FRAME:ToggleFrame(CraftSim.COST_DETAILS.frameWO, showCostDetails and exportMode == CraftSim.CONST.EXPORT_MODE.WORK_ORDER)
+	if recipeData and showCostDetails then
+		CraftSim.COST_DETAILS:UpdateDisplay(recipeData, exportMode)
+	end
 
 	if recipeData and showCraftResults then
 		CraftSim.CRAFT_RESULTS.FRAMES:UpdateRecipeData(recipeData.recipeID)
 	end
 
-	CraftSim.FRAME:ToggleFrame(CraftSim.FRAME:GetFrame(CraftSim.CONST.FRAMES.PRICE_OVERRIDE), showPriceOverride and exportMode == CraftSim.CONST.EXPORT_MODE.NON_WORK_ORDER)
-	CraftSim.FRAME:ToggleFrame(CraftSim.FRAME:GetFrame(CraftSim.CONST.FRAMES.PRICE_OVERRIDE_WORK_ORDER), showPriceOverride and exportMode == CraftSim.CONST.EXPORT_MODE.WORK_ORDER)
+	CraftSim.FRAME:ToggleFrame(CraftSim.CRAFTDATA.frame, showCraftData)
+	if showCraftData then
+		CraftSim.CRAFTDATA.FRAMES:UpdateDisplay(recipeData)
+	end
+
+	-- AverageProfit Module
+	CraftSim.FRAME:ToggleFrame(averageProfitFrame, showStatweights and exportMode == CraftSim.CONST.EXPORT_MODE.NON_WORK_ORDER)
+	CraftSim.FRAME:ToggleFrame(averageProfitFrameWO, showStatweights and exportMode == CraftSim.CONST.EXPORT_MODE.WORK_ORDER)
+	if recipeData and showStatweights then
+		local statWeights = CraftSim.AVERAGEPROFIT:CalculateStatWeights(recipeData)
+
+		if statWeights then
+			CraftSim.AVERAGEPROFIT.FRAMES:UpdateDisplay(statWeights, recipeData.priceData.craftingCosts, exportMode)
+		end
+
+		CraftSim.STATISTICS.FRAMES:UpdateDisplay(recipeData)
+	end
+
+	-- Cost Overview Module
+	CraftSim.FRAME:ToggleFrame(CraftSim.PRICE_DETAILS.frame, showCostOverview and exportMode == CraftSim.CONST.EXPORT_MODE.NON_WORK_ORDER)
+	CraftSim.FRAME:ToggleFrame(CraftSim.PRICE_DETAILS.frameWO, showCostOverview and exportMode == CraftSim.CONST.EXPORT_MODE.WORK_ORDER)
+	if recipeData and showCostOverview then
+		CraftSim.PRICE_DETAILS:UpdateDisplay(recipeData, exportMode)
+	end
+
+
+	-- Price Override Module
+	CraftSim.FRAME:ToggleFrame(priceOverrideFrame, showPriceOverride and exportMode == CraftSim.CONST.EXPORT_MODE.NON_WORK_ORDER)
+	CraftSim.FRAME:ToggleFrame(priceOverrideFrameWO, showPriceOverride and exportMode == CraftSim.CONST.EXPORT_MODE.WORK_ORDER)
 	if recipeData and showPriceOverride then
-		CraftSim.PRICE_OVERRIDE.FRAMES:UpdateFrames(recipeData, exportMode)
+		CraftSim.PRICE_OVERRIDE.FRAMES:UpdateDisplay(recipeData, exportMode)
 	end
 
-	if recipeData and recipeType ~= CraftSim.CONST.RECIPE_TYPES.NO_ITEM and recipeType ~= CraftSim.CONST.RECIPE_TYPES.GATHERING and recipeType ~= CraftSim.CONST.RECIPE_TYPES.NO_CRAFT_OPERATION then
-		CraftSim.FRAME:UpdateStatDetailsByExtraItemFactors(recipeData)
-	end
-
-	CraftSim.FRAME:ToggleFrame(CraftSim.FRAME:GetFrame(CraftSim.CONST.FRAMES.SPEC_INFO), showSpecInfo and recipeData and recipeData.specNodeData)
-	if recipeData and showSpecInfo and recipeData.specNodeData then
-		CraftSim.SPECIALIZATION_INFO.FRAMES:UpdateInfo(recipeData)
-	end
-
-	-- do not show simulation possibility on salvaging for now
-	showSimulationMode = showSimulationMode and recipeData and not recipeData.isSalvageRecipe
-	CraftSim.FRAME:ToggleFrame(CraftSim.SIMULATION_MODE.toggleButton, showSimulationMode)
-	CraftSim.SIMULATION_MODE.FRAMES:UpdateVisibility() -- show sim mode frames depending if active or not
-	if CraftSim.SIMULATION_MODE.isActive and recipeData then -- recipeData could still be nil here if e.g. in a gathering recipe
-		-- update simulationframe recipedata by inputs and the frontend
-		-- since recipeData is a reference here to the recipeData in the simulationmode, 
-		-- the recipeData that is used in the below modules should also be the modified one!
-		CraftSim.SIMULATION_MODE:UpdateSimulationMode()
-	end
-
-	showMaterialAllocation = showMaterialAllocation and recipeData.hasReagentsWithQuality
-	local materialOptimizationFrame = CraftSim.FRAME:GetFrame(CraftSim.CONST.FRAMES.MATERIALS)
-	local materialOptimizationWOFrame = CraftSim.FRAME:GetFrame(CraftSim.CONST.FRAMES.MATERIALS_WORK_ORDER)
-	CraftSim.FRAME:ToggleFrame(materialOptimizationFrame, showMaterialAllocation and exportMode == CraftSim.CONST.EXPORT_MODE.NON_WORK_ORDER)
-	CraftSim.FRAME:ToggleFrame(materialOptimizationWOFrame, showMaterialAllocation and exportMode == CraftSim.CONST.EXPORT_MODE.WORK_ORDER)
-	if showMaterialAllocation then
+	-- Material Optimization Module
+	CraftSim.FRAME:ToggleFrame(materialOptimizationFrame, showMaterialOptimization and exportMode == CraftSim.CONST.EXPORT_MODE.NON_WORK_ORDER)
+	CraftSim.FRAME:ToggleFrame(materialOptimizationFrameWO, showMaterialOptimization and exportMode == CraftSim.CONST.EXPORT_MODE.WORK_ORDER)
+	if recipeData and showMaterialOptimization then
 		CraftSim.UTIL:StartProfiling("Reagent Optimization")
-		CraftSim.REAGENT_OPTIMIZATION:OptimizeReagentAllocation(recipeData, recipeType, priceData, exportMode)
+		local optimizationResult = CraftSim.REAGENT_OPTIMIZATION:OptimizeReagentAllocation(recipeData, CraftSimOptions.materialSuggestionInspirationThreshold)
+		CraftSim.REAGENT_OPTIMIZATION.FRAMES:UpdateReagentDisplay(recipeData, optimizationResult, exportMode)
 		CraftSim.UTIL:StopProfiling("Reagent Optimization")
 	end
 
-	CraftSim.FRAME:ToggleFrame(CraftSimDetailsFrame, showStatweights and exportMode == CraftSim.CONST.EXPORT_MODE.NON_WORK_ORDER)
-	CraftSim.FRAME:ToggleFrame(CraftSimDetailsWOFrame, showStatweights and exportMode == CraftSim.CONST.EXPORT_MODE.WORK_ORDER)
-	if showStatweights then
-		local statWeights = CraftSim.AVERAGEPROFIT:getProfessionStatWeightsForCurrentRecipe(recipeData, priceData, exportMode)
-		if statWeights ~= CraftSim.CONST.ERROR.NO_PRICE_DATA then
-			CraftSim.AVERAGEPROFIT.FRAMES:UpdateAverageProfitDisplay(priceData, statWeights, exportMode)
-			CraftSim.STATISTICS.FRAMES:UpdateStatistics(recipeData, priceData)
-		end
-	end
-
-	CraftSim.FRAME:ToggleFrame(CraftSimSimFrame, showTopGear and exportMode == CraftSim.CONST.EXPORT_MODE.NON_WORK_ORDER)
-	CraftSim.FRAME:ToggleFrame(CraftSimSimWOFrame, showTopGear and exportMode == CraftSim.CONST.EXPORT_MODE.WORK_ORDER)
+	-- Top Gear Module
+	CraftSim.FRAME:ToggleFrame(topgearFrame, showTopGear and exportMode == CraftSim.CONST.EXPORT_MODE.NON_WORK_ORDER)
+	CraftSim.FRAME:ToggleFrame(topgearFrameWO, showTopGear and exportMode == CraftSim.CONST.EXPORT_MODE.WORK_ORDER)
 	if recipeData and showTopGear then
-		CraftSim.TOPGEAR.FRAMES:UpdateModeDropdown(exportMode)
+		CraftSim.TOPGEAR.FRAMES:UpdateModeDropdown(recipeData, exportMode)
 		if CraftSimOptions.topGearAutoUpdate then
 			CraftSim.UTIL:StartProfiling("Top Gear")
-			CraftSim.TOPGEAR:SimulateBestProfessionGearCombination(recipeData, recipeData.recipeType, priceData, exportMode)
+			CraftSim.TOPGEAR:OptimizeAndDisplay(recipeData)
 			CraftSim.UTIL:StopProfiling("Top Gear")
 		else
 			local isCooking = recipeData.professionID == Enum.Profession.Cooking
-			CraftSim.TOPGEAR.FRAMES:ClearTopGearDisplay(isCooking, true, exportMode)
+			CraftSim.TOPGEAR.FRAMES:ClearTopGearDisplay(recipeData, true, exportMode)
 		end
 	end
 
-	CraftSim.FRAME:ToggleFrame(CraftSimCostOverviewFrame, showCostOverview and exportMode == CraftSim.CONST.EXPORT_MODE.NON_WORK_ORDER)
-	CraftSim.FRAME:ToggleFrame(CraftSimCostOverviewWOFrame, showCostOverview and exportMode == CraftSim.CONST.EXPORT_MODE.WORK_ORDER)
-	if showCostOverview then
-		CraftSim.COSTOVERVIEW:CalculateCostOverview(recipeData, recipeType, priceData, exportMode)
+	-- SpecInfo Module
+	CraftSim.FRAME:ToggleFrame(specInfoFrame, showSpecInfo and recipeData and exportMode == CraftSim.CONST.EXPORT_MODE.NON_WORK_ORDER)
+	CraftSim.FRAME:ToggleFrame(specInfoFrameWO, showSpecInfo and recipeData and exportMode == CraftSim.CONST.EXPORT_MODE.WORK_ORDER)
+	if recipeData and showSpecInfo then
+		CraftSim.SPECIALIZATION_INFO.FRAMES:UpdateInfo(recipeData)
 	end
+end
+
+function CraftSim_OnAddonCompartmentClick()
+	InterfaceOptionsFrame_OpenToCategory(CraftSim.OPTIONS.optionsPanel)
 end

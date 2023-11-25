@@ -1,16 +1,29 @@
-AddonName, CraftSim = ...
+CraftSimAddonName, CraftSim = ...
 
 CraftSim_DEBUG = {}
 
 CraftSim_DEBUG.isMute = false
 
-function CraftSim_DEBUG:PrintRecipeIDs()
-    local recipeInfo = ProfessionsFrame.CraftingPage.SchematicForm:GetRecipeInfo()
-    local itemID = CraftSim.ENCHANT_RECIPE_DATA[recipeInfo.recipeID]
+function CraftSim_DEBUG:PrintRecipeIDs(recipeID)
+    recipeID = recipeID or CraftSim.MAIN.currentRecipeData.recipeID
+    local recipeInfo = C_TradeSkillUI.GetRecipeInfo(recipeID)
+
+    if not recipeInfo then
+        print("No RecipeInfo found")
+        return
+    end
+
+    local itemID = nil
     if recipeInfo.isEnchantingRecipe then
-         itemID = CraftSim.ENCHANT_RECIPE_DATA[recipeInfo.recipeID].q1
+        local enchantOutput = CraftSim.ENCHANT_RECIPE_DATA[recipeInfo.recipeID]
+        if enchantOutput then
+            itemID = CraftSim.ENCHANT_RECIPE_DATA[recipeInfo.recipeID].q1
+        else
+            print("no output for enchanting recipe found")
+            return
+        end
     else
-        itemID = CraftSim.UTIL:GetItemIDByLink(recipeInfo.hyperlink)
+        itemID = CraftSim.GUTIL:GetItemIDByLink(recipeInfo.hyperlink)
     end
     local itemName, itemLink, itemQuality, itemLevel, itemMinLevel, itemType, itemSubType,
     itemStackCount, itemEquipLoc, itemTexture, sellPrice, classID, subclassID, bindType,
@@ -34,40 +47,7 @@ function CraftSim_DEBUG:CompareStatData()
     local function print(text, r, l) -- override
         CraftSim_DEBUG:print(text, CraftSim.CONST.DEBUG_IDS.SPECDATA, r, l)
     end
-    CraftSim_DEBUG.isMute = true
-    local exportMode = ProfessionsFrame.OrdersPage:IsVisible() and CraftSim.CONST.EXPORT_MODE.WORK_ORDER or CraftSim.CONST.EXPORT_MODE.NON_WORK_ORDER
-    local recipeDataV1 = CraftSim.DATAEXPORT:exportRecipeData(CraftSim.MAIN.currentRecipeID, exportMode)
-    if not recipeDataV1 then
-        CraftSim_DEBUG.isMute = false
-        print("No recipe opened", false, true)
-        return
-    end
-    local recipeDataV2 = CopyTable(recipeDataV1)
-    local statsUI =  CraftSim.DATAEXPORT:handlePlayerProfessionStatsV1(recipeDataV1, recipeDataV1.operationInfo)
-    local statsBuildUp =  CraftSim.DATAEXPORT:handlePlayerProfessionStatsV2(recipeDataV1, recipeDataV1.operationInfo)
-
-    CraftSim_DEBUG.isMute = false
-    print("Stat Compare - UI / Specdata:", false, true)
-    print("Total Skill: " .. tostring(recipeDataV1.stats.skill) .. " / " .. tostring(recipeDataV2.stats.skill))
-    print("Skill No Reagents: " .. tostring(recipeDataV1.stats.skillNoReagents) .. " / " .. tostring(recipeDataV2.stats.skillNoReagents))
-    print("Skill No Items: " .. tostring(recipeDataV1.stats.skillNoItems) .. " / " .. tostring(recipeDataV2.stats.skillNoItems))
-    if recipeDataV1.stats.inspiration then
-        print("Inspiration: " .. tostring(recipeDataV1.stats.inspiration.value) .. " / " .. tostring(recipeDataV2.stats.inspiration.value))
-        print("Inspiration %: " .. tostring(recipeDataV1.stats.inspiration.percent) .. " / " .. tostring(recipeDataV2.stats.inspiration.percent))
-        print("Inspiration Skill: " .. tostring(recipeDataV1.stats.inspiration.bonusskill) .. " / " .. tostring(recipeDataV2.stats.inspiration.bonusskill))
-    end
-    if recipeDataV1.stats.multicraft then
-        print("Multicraft: " .. tostring(recipeDataV1.stats.multicraft.value) .. " / " .. tostring(recipeDataV2.stats.multicraft.value))
-        print("Multicraft %: " .. tostring(recipeDataV1.stats.multicraft.percent) .. " / " .. tostring(recipeDataV2.stats.multicraft.percent))
-    end
-    if recipeDataV1.stats.resourcefulness then
-        print("Resourcefulness: " .. tostring(recipeDataV1.stats.resourcefulness.value) .. " / " .. tostring(recipeDataV2.stats.resourcefulness.value))
-        print("Resourcefulness %: " .. tostring(recipeDataV1.stats.resourcefulness.percent) .. " / " .. tostring(recipeDataV2.stats.resourcefulness.percent))
-    end
-    if recipeDataV1.stats.craftingspeed then
-        print("CraftingSpeed: " .. tostring(recipeDataV1.stats.craftingspeed.value) .. " / " .. tostring(recipeDataV2.stats.craftingspeed.value))
-        print("CraftingSpeed %: " .. tostring(recipeDataV1.stats.craftingspeed.percent) .. " / " .. tostring(recipeDataV2.stats.craftingspeed.percent))
-    end
+    
 end
 
 function CraftSim_DEBUG:TestAllocationSkillFetchV2()
@@ -88,44 +68,168 @@ function CraftSim_DEBUG:CheckSpecNode(nodeID)
         CraftSim_DEBUG:print(text, CraftSim.CONST.DEBUG_IDS.SPECDATA, r, l)
     end
 
-    local recipeData = CraftSim.MAIN.currentRecipeData
-
-    if not recipeData or not recipeData.specNodeData then
-        print("CraftSim Debug Error: No recipeData or not specNodeData", false, true)
-        return
-    end
-    
-    local professionID = recipeData.professionID
-
-    local professionNodes = CraftSim.SPEC_DATA:GetNodes(professionID)
-    local ruleNodes = CraftSim.SPEC_DATA.RULE_NODES()[professionID]
-    if type(nodeID) == "string" then
-        local nodeEntry_1 = ruleNodes[nodeID]
-        if not nodeEntry_1 then
-            print("Error: node not found: " .. tostring(nodeID))
-        end
-        nodeID = ruleNodes[nodeID].nodeID
-    end
-    local debugNode = CraftSim.UTIL:FilterTable(professionNodes, function(node) 
-        return node.nodeID == nodeID
-    end)
-    print("Debug Node: " .. tostring(debugNode[1].name), false, true)
-
-
-    local statsFromData = CraftSim.SPEC_DATA:GetStatsFromSpecNodeData(recipeData, ruleNodes, nodeID, true)
-
-    print("Stats from node: ")
-    print(statsFromData, CraftSim.CONST.DEBUG_IDS.SPECDATA, true)
 end
 
-function CraftSim_DEBUG:print(debugOutput, debugID, recursive, printLabel)
-    
+function CraftSim_DEBUG:print(debugOutput, debugID, recursive, printLabel, level)
     if CraftSimOptions["enableDebugID_" .. debugID] and not CraftSim_DEBUG.isMute then
         if type(debugOutput) == "table" then
-            CraftSim.UTIL:PrintTable(debugOutput, debugID, recursive)
+            CraftSim.UTIL:PrintTable(debugOutput, debugID, recursive, level)
         else
-            local debugFrame = CraftSim.FRAME:GetFrame(CraftSim.CONST.FRAMES.DEBUG)
+            local debugFrame = CraftSim.GGUI:GetFrame(CraftSim.MAIN.FRAMES, CraftSim.CONST.FRAMES.DEBUG)
             debugFrame.addDebug(debugOutput, debugID, printLabel)
         end
     end
+end
+
+---This is an example for the usage of CraftSim's recipeData Object. It will most like
+---@param recipeID any
+function CraftSim_DEBUG:exampleAPIUsage(recipeID)
+    local print = CraftSim.UTIL:SetDebugPrint(CraftSim.CONST.DEBUG_IDS.DATAEXPORT)
+    local recipeData = CraftSim.RecipeData(recipeID)
+    
+    local reagentList = { -- draconium ore q1 q2 q3
+        {
+            itemID = 189143,
+            quantity = 0,
+        },
+        {
+            itemID = 188658,
+            quantity = 0,
+        },
+        {
+            itemID = 190311,
+            quantity = 0,
+        },
+        { -- khaz ore q3
+            itemID = 190314,
+            quantity = 0,
+        },
+    }
+
+    recipeData:SetReagents(reagentList)
+    print("Reagent Data:")
+    print(recipeData.reagentData)
+    recipeData:SetOptionalReagent(191513) -- stable fluid draconium Q3 = 25% more inspiration skill
+    recipeData:UpdateProfessionStats()
+    recipeData.resultData:Update()
+
+    print("ResultData: ")
+    print(recipeData.resultData)
+
+    print("Skill: " .. recipeData.professionStats.skill.value)
+    print("Inspiration Skill: " .. recipeData.professionStats.inspiration.extraValue)
+
+    recipeData.priceData:Update()
+
+    print(recipeData.priceData)
+end
+
+function CraftSim_DEBUG:GGUITest()
+    local testFrame = CraftSim.GGUI.Frame({
+        title="DEBUG TEST",
+        sizeX= 300,
+        sizeY= 300,
+        backdropOptions = {
+            bgFile="Interface\\CharacterFrame\\UI-Party-Background",
+        },
+        closeable=true,
+        collapseable=true,
+        moveable=true,
+        scrollableContent=true,
+        frameTable=CraftSim.MAIN.FRAMES,
+        frameConfigTable=CraftSimGGUIConfig,
+    })
+
+    local testIcon = CraftSim.GGUI.Icon({
+        parent=testFrame.content,
+        anchorParent=testFrame.content,
+        anchorA="TOP",
+        anchorB="TOP",
+        offsetY=-50
+    })
+
+    local testID = 191500
+    testIcon:SetItem(testID)
+
+
+    local testDropdown = CraftSim.GGUI.Dropdown({
+        parent=testFrame.content,
+        anchorParent=testIcon.frame,
+        anchorA="TOP",
+        anchorB="BOTTOM",
+        initialData= {{label="Test1", value=1}, {label="Test2", value=2}, {label="TestCategory", isCategory=true, value={{label="Test1", value={someTable=1}}, {label="Test2", value=2}}}},
+        clickCallback = function(_, label, value) print("clicked on: " .. tostring(label) .. " with value " .. tostring(value)) end
+    })
+
+    local testText = CraftSim.GGUI.Text({
+        parent=testFrame.content,
+        anchorParent=testDropdown.frame,
+        anchorA="TOP",
+        anchorB="BOTTOM",
+        offsetY=-10,
+        text="Test!!!"
+    })
+
+    local testButton = CraftSim.GGUI.Button({
+        parent=testFrame.content,
+        anchorParent=testText.frame,
+        anchorA="TOP",
+        anchorB="BOTTOM",
+        label="Test Button 1",
+        adjustWidth=true,
+        initialStatusID="1",
+        clickCallback = function(button) 
+            local statusID = button:GetStatus()
+            if statusID == "1" then
+                button:SetStatus("2")
+            elseif statusID == "2" then
+                button:SetStatus("3")
+            elseif statusID == "3" then
+                button:SetStatus("4")
+            elseif statusID == "4" then
+                button:SetStatus("1")
+            end
+        end,
+    })
+
+    testButton:SetStatusList({
+        {
+            statusID="1",
+            anchorA="TOP",
+            anchorB="BOTTOM",
+            label="Test Button 1",
+        },
+        {
+            statusID="2",
+            anchorA="LEFT",
+            anchorB="RIGHT",
+            label="Test Button 2",
+        },
+        {
+            statusID="3",
+            anchorA="BOTTOM",
+            anchorB="TOP",
+            label="Test Button 3",
+        },
+        {
+            statusID="4",
+            anchorA="RIGHT",
+            anchorB="LEFT",
+            label="Test Button 4",
+        },
+    })
+
+    local numericInput = CraftSim.GGUI.NumericInput({
+        parent=testFrame.frame,
+        anchorParent=testButton.frame,
+        anchorA="TOP",
+        anchorB="BOTTOM",
+        incrementOneButtons=true,
+        maxValue=10,
+        minValue=0,
+        borderAdjustWidth=0.95,
+        borderWidth=25,
+    })
+
+
 end

@@ -181,14 +181,40 @@ CraftSim.OPTIONAL_REAGENT_DATA = {
     [191873] = {recipeDifficulty = 25, qualityID = 3}, 
 
 
+    --- 10.1 Additions
+    -- General
+    [204673] = {recipeDifficulty = 150},-- Titan Matrix V
+    [204681] = {recipeDifficulty = 160},-- Enchanted Whelpling's Shadowflame Crest
+    [204682] = {recipeDifficulty = 30}, -- Enchanted Wyrm’s Shadowflame Crest
+    [204697] = {recipeDifficulty = 50}, -- Enchanted Aspect’s Shadowflame Crest
     
+    -- Leatherworking
+    [204708] = {recipeDifficulty = 35}, -- Shadowflame Tempered Armor Patch
+    [204709] = {recipeDifficulty = 30},
+    [204710] = {recipeDifficulty = 25},
+    
+    -- Tailoring
+    [205012] = {recipeDifficulty = 25}, -- Reserve Parachute
 
+    --- 10.2 Additions
+    -- General
+    [206977] = {recipeDifficulty = 160},-- Enchanted Whelpling's Shadowflame Crest
+    [206960] = {recipeDifficulty = 30}, -- Enchanted Wyrm’s Shadowflame Crest
+    [206961] = {recipeDifficulty = 50}, -- Enchanted Aspect’s Shadowflame Crest
 
+    -- Tailoring
+    [210671] = {recipeDifficulty = 35, qualityID = 1}, -- Verdant Tether
+    [210672] = {recipeDifficulty = 30, qualityID = 2}, 
+    [210673] = {recipeDifficulty = 25, qualityID = 3}, 
 
+    -- Leatherworking
+    [208187] = {recipeDifficulty = 35, qualityID = 1}, -- Verdant Conduit
+    [208188] = {recipeDifficulty = 30, qualityID = 2}, 
+    [208189] = {recipeDifficulty = 25, qualityID = 3}, 
 
-
-
-
-
+    -- Jewelcrafting
+    [208746] = {recipeDifficulty = 35, qualityID = 1}, -- Dreamtender's Charm
+    [208747] = {recipeDifficulty = 30, qualityID = 2}, 
+    [208748] = {recipeDifficulty = 25, qualityID = 3}, 
 
 }

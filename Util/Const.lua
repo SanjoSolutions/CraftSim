@@ -3,8 +3,6 @@ _, CraftSim = ...
 CraftSim.CONST = {}
 
 -- One Time Info ------------
-CraftSim.CONST.currentInfoVersionID = 93 -- last patch increase: 9.0.4
-CraftSim.CONST.debugInfoText = false
 CraftSim.CONST.infoBoxSizeX = 500
 CraftSim.CONST.infoBoxSizeY = 400
 ----------------
@@ -30,6 +28,7 @@ CraftSim.CONST.BASE_RESOURCEFULNESS_AVERAGE_SAVE_FACTOR = 0.30
 CraftSim.CONST.MULTICRAFT_CONSTANT = 2.5
 
 CraftSim.CONST.DISCORD_INVITE_URL = "https://discord.gg/7vqKMgezXR"
+CraftSim.CONST.PAYPAL_ME_URL = "https://www.paypal.com/paypalme/CraftSim"
 
 CraftSim.CONST.EXPORT_MODE = {
     NON_WORK_ORDER = 0,
@@ -261,6 +260,20 @@ CraftSim.CONST.RECIPE_CATEGORIES = {
         ALCHEMIST_STONES = 1605,
         CAULDRONS = 1612,
     },
+    ENCHANTING = {
+        FINISHING_REAGENTS = 1792,
+        CLOAK_ENCHANTMENTS = 1778,
+        CHEST_ENCHANTMENTS = 1777,
+        BRACER_ENCHANTMENTS = 1776,
+        BOOT_ENCHANTMENTS = 1775,
+        RING_ENCHANTMENTS = 1774,
+        WEAPON_ENCHANTMENTS = 1779,
+        PROFESSION_TOOL_ENCHANTMENTS = 1780,
+        RODS_AND_WANDS = 1781,
+        ILLUSORY_GOODS = 1782,
+        SHATTERS = 1783,
+        MAGICAL_MERCHANDISE = 1803,
+    },
     ENGINEERING = {
         PARTS = 1718,
         FINISHING_REAGENTS = 1717,
@@ -382,6 +395,25 @@ CraftSim.CONST.RECIPE_ITEM_SUBTYPES = {
         ELEMENTAL = 10, -- transmutations
         EXPLOSIVES_AND_DEVICES = 0, -- transmutations
         MISC = 0, -- trinket
+    },
+    ENCHANTING = {
+        FINISHING_REAGENTS = 19,
+        RODS = 8,
+        WANDS = 19,
+        ILLUSIONS = 8, -- weapon enchantment transmogs and toys
+        ILLUSORY_ADORNMENTS = 2, -- temporary shoulder glows
+        SCEPTERS = 14, -- scepters of spectacle
+        SHATTERS = 4,
+        COMPANION_PETS = 2,
+
+        -- Gear Enchantments
+        CLOAK = 3,
+        CHEST = 4,
+        WRIST = 5,
+        FEET = 9,
+        FINGER = 10,
+        WEAPON = 11,
+        PROFESSION_TOOL = 14,
     },
     ENGINEERING = {
         PARTS = 1,
@@ -848,6 +880,7 @@ CraftSim.CONST.IMPLEMENTED_SKILL_BUILD_UP = function()
     return {
         Enum.Profession.Alchemy,
         Enum.Profession.Blacksmithing,
+        Enum.Profession.Enchanting,
         Enum.Profession.Engineering,
         Enum.Profession.Inscription,
         Enum.Profession.Jewelcrafting,

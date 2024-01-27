@@ -470,11 +470,10 @@ function CraftSim.CRAFTQ.CreateAuctionatorShoppingListAll()
         end
         -- subtract the total item count of all crafter's cached inventory
         local totalItemCount = GUTIL:Fold(crafterUIDs, function(itemCount, crafterUID)
-            if type(itemCount) ~= "number" then return 0 end -- consider first iteration
             local itemCountForCrafter = CraftSim.CRAFTQ:GetItemCountFromCraftQueueCache(itemID, true, false, true,
                 crafterUID)
             return itemCount + itemCountForCrafter
-        end)
+        end, false, 0)
 
         local searchTerm = {
             searchString = info.itemName,
